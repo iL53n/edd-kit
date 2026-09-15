@@ -58,12 +58,20 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--verbose", action="store_true", default=argparse.SUPPRESS)
         if name in {"init", "sync"}:
             command.add_argument("--agent", choices=["codex", "claude", "none"], default="codex")
+        if name == "demo":
+            command.add_argument(
+                "example",
+                nargs="?",
+                choices=["cancellation"],
+                default="cancellation",
+                help="Bundled demonstration to run (default: cancellation)",
+            )
         if name == "sync":
             command.add_argument(
                 "--apply", action="store_true", help="Apply safe updates (default: preview)"
             )
         if name not in {"init", "sync", "doctor", "demo"}:
-            command.add_argument("change", nargs="?" if name == "status" else None)
+            command.add_argument("change", nargs="?" if name in {"status", "check"} else None)
         if name == "prepare":
             command.add_argument(
                 "--brief", required=True, help="Intended behavior in natural language"
@@ -140,9 +148,7 @@ def _doctor(root: Path) -> dict:
     if os.name != "posix":
         problems.append("Execution requires Linux or macOS")
     if backend != "4.2.3":
-        problems.append(
-            "Install the tested backend: pip install 'edd-kit[deepeval]' from the built wheel"
-        )
+        problems.append("Reinstall the complete tool: uv tool install --reinstall edd-kit")
     return {
         "command": "doctor",
         "decision": "ERROR" if problems else "PASS",
@@ -320,12 +326,18 @@ def dispatch(args) -> dict:
     raise ProjectError("Unknown command")
 
 
-def _known_change(root: Path, change: str) -> str:
+def _known_change(root: Path, change: str | None) -> str:
     directory = changes_directory(root)
+    choices = sorted(path.parent.name for path in directory.glob("*/contract.json"))
+    if change is None:
+        if len(choices) == 1:
+            return choices[0]
+        if not choices:
+            raise ProjectError("No prepared changes; run edd prepare <change> --brief '<behavior>'")
+        raise ProjectError(f"Change is ambiguous; choose one explicitly: {', '.join(choices)}")
     contract = directory / change / "contract.json"
     if contract.is_file():
         return change
-    choices = sorted(path.parent.name for path in directory.glob("*/contract.json"))
     matches = difflib.get_close_matches(change, choices, n=3, cutoff=0.45)
     suggestion = f" Did you mean: {', '.join(matches)}?" if matches else ""
     available = f" Available changes: {', '.join(choices)}." if choices else ""

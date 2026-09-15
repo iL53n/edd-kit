@@ -9,8 +9,12 @@ even if you have no evaluation suite yet.
 Your agent authors the cases and DeepEval metrics. EDD's local Python CLI validates and runs
 them, keeping evidence you can inspect locally or use in CI. No EDD cloud account is required.
 
-[Quickstart](#install-and-try) · [Use on your project](#use-on-your-project) ·
-[Results](#understand-results) · [Documentation](#next-steps)
+[Step-by-step guide](docs/getting-started.md) · [Quick demo](#install-and-try) ·
+[Use on your project](#use-on-your-project) · [Results](#understand-results) ·
+[Documentation](#next-steps)
+
+New to EDD? Follow the [complete getting-started guide](docs/getting-started.md) from installation
+through specialist review, implementation, fresh acceptance evidence, and optional CI.
 
 ## How it works
 
@@ -33,19 +37,18 @@ the evidence. Missing review or incomplete evidence remains visible; it cannot c
 
 ## Install and try
 
-### 1. Set up the CLI
+### 1. Install the CLI
 
-Use **Python 3.11–3.13**, **Linux or macOS**, and **uv**. From this repository's root:
+Use **Python 3.11–3.13**, **Linux or macOS**, and **uv**:
 
 ```bash
-uv sync --locked --extra deepeval --group dev
-source .venv/bin/activate
-edd --help
+uv tool install edd-kit
 edd doctor
 ```
 
-Keep this environment active when changing directories. For wheel builds and installation
-checks, see [Contributing](CONTRIBUTING.md#distribution-checks).
+`uv` installs `edd` into an isolated tool environment, including the tested DeepEval backend. If
+your shell cannot find it, run `uv tool update-shell`, restart the shell, and try `edd --help`.
+For source development and wheel checks, see [Contributing](CONTRIBUTING.md#development-environment).
 
 ### 2. See the core idea
 
@@ -65,10 +68,11 @@ The recommended path keeps feature authoring in your coding-agent chat:
 
 ```bash
 cd /path/to/your-project
-edd init --agent codex  # use claude or none when appropriate
+edd init  # Codex integration is the default
 ```
 
-Restart the coding-agent session if initialization installed new skills, then use:
+Use `edd init --agent claude` for Claude Code or `--agent none` for direct CLI authoring. Restart
+the coding-agent session if initialization installed new skills, then use:
 
 ```text
 $edd-prepare Add an assistant that cancels an eligible order owned by the user.
@@ -184,9 +188,9 @@ The offline example does not establish the quality of a live model or applicatio
 | ERROR | Configuration, execution, or evidence integrity is invalid | 2 |
 | INCONCLUSIVE | Required evidence, coverage, review, or freshness is missing | 3 |
 
-- **Run fresh checks:** `edd check CHANGE --target candidate` runs the control audit, candidate
-  acceptance evaluation, and verification. Add `--report-dir .edd/CHANGE/report --revision REV`
-  to write one Markdown/JSON evidence bundle.
+- **Run fresh checks:** `edd check` infers the change and application target when each is unique.
+  Otherwise use `edd check CHANGE --target candidate`. Add
+  `--report-dir .edd/CHANGE/report --revision REV` to write one Markdown/JSON evidence bundle.
 - **Verify saved evidence:** `edd verify CHANGE` assesses existing records without running evaluations.
 - **Export saved evidence:** `edd report CHANGE --acceptance --output-dir PATH` creates the same
   report while labelling reused runs as saved rather than fresh.
@@ -223,6 +227,7 @@ use repository review and protected CI for approval policy. See [Security](SECUR
 
 ## Next steps
 
+- [Step-by-step guide](docs/getting-started.md) — installation through review, acceptance, and CI.
 - [Workflow and CI](docs/workflow.md) — preparation, review, implementation, and team adoption.
 - [Authoring reference](docs/authoring.md) — contract schema, Python suite interface, and target protocol.
 - [Invoice extraction example](examples/invoice-extraction/README.md) — another domain, including an existing application.

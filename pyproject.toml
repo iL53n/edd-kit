@@ -9,10 +9,13 @@ description = "Prepare executable acceptance criteria before implementing LLM fe
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-dependencies = ["pydantic>=2.11,<3"]
+dependencies = ["deepeval==4.2.3", "pydantic>=2.11,<3"]
 
-[project.optional-dependencies]
-deepeval = ["deepeval==4.2.3"]
+[project.urls]
+Homepage = "https://github.com/iL53n/edd-kit"
+Documentation = "https://github.com/iL53n/edd-kit/blob/main/docs/getting-started.md"
+Repository = "https://github.com/iL53n/edd-kit.git"
+Issues = "https://github.com/iL53n/edd-kit/issues"
 
 [project.scripts]
 edd = "edd_kit.cli:main"

@@ -36,7 +36,7 @@ jobs:
           python-version: "3.12"
           enable-cache: false
       - name: Install locked environment
-        run: uv sync --locked --extra deepeval --group dev
+        run: uv sync --locked --group dev
       - name: Lint
         run: uv run --no-sync ruff check src tests scripts
       - name: Check formatting
@@ -46,7 +46,7 @@ jobs:
       - name: Verify packaged evaluator lock matches the project lock
         shell: bash
         run: |
-          uv export --locked --extra deepeval --no-dev --no-emit-project --no-header --no-annotate --quiet \
+          uv export --locked --no-dev --no-emit-project --no-header --no-annotate --quiet \
             | diff -u - <(tail -n +2 src/edd_kit/assets/requirements-eval.lock)
 
   test:
@@ -68,7 +68,7 @@ jobs:
           python-version: ${{ matrix.python }}
           enable-cache: false
       - name: Install locked environment
-        run: uv sync --locked --extra deepeval --group dev
+        run: uv sync --locked --group dev
       - name: Run tests without provider credentials
         run: uv run --no-sync python -m pytest --junitxml=test-results/pytest.xml
       - name: Retain test results
@@ -94,11 +94,17 @@ jobs:
           python-version: "3.12"
           enable-cache: false
       - name: Install locked build and runtime dependencies
-        run: uv sync --locked --extra deepeval --group dev
+        run: uv sync --locked --group dev
       - name: Build source and wheel distributions
         run: uv run --no-sync python -m build --no-isolation
       - name: Validate distribution metadata
         run: uv run --no-sync python -m twine check --strict dist/*
+      - name: Exercise the uv tool install contract
+        run: >-
+          uv run --no-sync python scripts/smoke_tool_install.py
+          --uv "$GITHUB_WORKSPACE/.venv/bin/uv"
+          --wheel "$GITHUB_WORKSPACE"/dist/*.whl
+          --python "$GITHUB_WORKSPACE/.venv/bin/python"
       - name: Install the wheel over the editable package
         run: uv pip install --python .venv/bin/python --reinstall --no-deps dist/*.whl
       - name: Exercise packaged resources from outside the checkout

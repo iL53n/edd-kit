@@ -1,7 +1,7 @@
 # Copy to .github/workflows/edd.yml in the adopting repository.
 # Call from its existing pull_request workflow with explicit change/target inputs.
 # Prerequisites: commit edd.toml, the prepared pipeline, REVIEW.md and review.json,
-# plus pyproject.toml/uv.lock with edd-kit[deepeval] in an "eval" dependency group.
+# plus pyproject.toml/uv.lock with edd-kit in an "eval" dependency group.
 # The review log records prior domain and technical decisions; CI does not create approval.
 name: EDD acceptance
 

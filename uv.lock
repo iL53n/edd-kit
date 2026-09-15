@@ -668,12 +668,8 @@ name = "edd-kit"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pydantic" },
-]
-
-[package.optional-dependencies]
-deepeval = [
     { name = "deepeval" },
+    { name = "pydantic" },
 ]
 
 [package.dev-dependencies]
@@ -690,10 +686,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "deepeval", marker = "extra == 'deepeval'", specifier = "==4.2.3" },
+    { name = "deepeval", specifier = "==4.2.3" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]
-provides-extras = ["deepeval"]
 
 [package.metadata.requires-dev]
 dev = [

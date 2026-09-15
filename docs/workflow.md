@@ -135,7 +135,10 @@ This workflow supports cooperative contributors. Local review records and hashes
 
 Copy the packaged `assets/ci/edd.yml` resource to `.github/workflows/edd.yml` in the adopting repository. In this source checkout it is available at [the workflow template](../src/edd_kit/assets/ci/edd.yml). Initialization does not install CI configuration automatically.
 
-The template expects a committed `pyproject.toml` and `uv.lock` with the chosen EDD distribution and its DeepEval extra in an `eval` dependency group. Pin the distribution you have reviewed, whether installed from a release wheel or a versioned package source. Configure any application dependencies in the same locked environment.
+The template expects a committed `pyproject.toml` and `uv.lock` with the chosen EDD distribution in
+an `eval` dependency group. The standard distribution includes the tested DeepEval backend. Pin the
+release you reviewed and configure application-specific evaluation dependencies in the same locked
+environment.
 
 Call the reusable workflow from a project workflow with the relevant change and target:
 

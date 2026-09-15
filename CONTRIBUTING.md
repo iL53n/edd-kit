@@ -7,7 +7,7 @@ EDD generates executable acceptance criteria before feature implementation. Pres
 Use Python 3.11, 3.12, or 3.13 on Linux or macOS. Install a uv version compatible with the committed lockfile; the CI installer reads its uv version from `uv.lock`.
 
 ```bash
-uv sync --locked --extra deepeval --group dev
+uv sync --locked --group dev
 export PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
 export DEEPEVAL_TELEMETRY_OPT_OUT=YES
 export DEEPEVAL_DISABLE_DOTENV=1
@@ -44,8 +44,32 @@ uv run --no-sync python -m build --no-isolation
 uv run --no-sync python -m twine check --strict dist/*
 ```
 
-The [CI workflow](.github/workflows/ci.yml) also installs the wheel over the editable checkout and exercises packaged skills, templates, and CLI scaffolding from a temporary directory. Its required check succeeds only when lint, types, all six operating-system/Python test combinations, and the distribution smoke test succeed.
+The [CI workflow](.github/workflows/ci.yml) also installs the wheel as an isolated uv tool and over
+the editable checkout, then exercises packaged skills, templates, and CLI scaffolding from temporary
+directories. Its required check succeeds only when lint, types, all six operating-system/Python test
+combinations, and all distribution smoke tests succeed.
 
 The [release-artifact workflow](.github/workflows/release.yml) runs the same checks when manually dispatched for a selected revision. Download and inspect its wheel and source distribution before any separately authorized publication. A successful local run does not establish that the hosted matrix has run.
+
+## Publishing to PyPI
+
+`uv tool install edd-kit` resolves the package from PyPI. Before the first release, configure a
+PyPI pending trusted publisher for project `edd-kit` with GitHub owner `iL53n`, repository
+`edd-kit`, workflow `publish.yml`, and environment `pypi`. Create a matching protected `pypi`
+environment in the GitHub repository. No long-lived PyPI token is required.
+
+After the release artifact and version have been reviewed, create and push an annotated version
+tag that exactly matches `pyproject.toml`:
+
+```bash
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin v0.1.0
+```
+
+The tag-triggered [publish workflow](.github/workflows/publish.yml) reruns the full CI matrix, checks
+that the tag matches the package version, builds and smoke-tests the distributions in an isolated
+uv tool environment, and publishes from a separate least-privilege job using PyPI trusted
+publishing. Do not reuse a version already uploaded to PyPI; increment the project version and lock
+before tagging the next release.
 
 Action updates should retain full commit pins and verify each revision against the upstream release. Current pins were resolved from [checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1), [setup-uv v10.1.0](https://github.com/astral-sh/setup-uv/releases/tag/v10.1.0), and [upload-artifact v7.0.1](https://github.com/actions/upload-artifact/releases/tag/v7.0.1).

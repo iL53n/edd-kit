@@ -252,9 +252,28 @@ def test_demo_is_isolated_and_detects_both_seeded_defects(tmp_path):
     assert list(tmp_path.iterdir()) == before
 
 
+def test_demo_accepts_the_documented_cancellation_name(tmp_path):
+    result = command(tmp_path, "demo", "cancellation", "--json")
+
+    assert result.returncode == 0, result.stdout
+    assert json.loads(result.stdout)["demonstrated"] is True
+
+
 def test_unknown_change_suggests_near_match(tmp_path):
     assert command(tmp_path, "init", "--agent", "none").returncode == 0
     assert command(tmp_path, "prepare", "answering", "--brief", "Answer").returncode == 0
     result = command(tmp_path, "status", "ansering", "--json")
     assert result.returncode == 2
     assert "Did you mean: answering?" in json.loads(result.stdout)["error"]
+
+
+def test_check_without_change_uses_the_only_prepared_change(tmp_path):
+    assert command(tmp_path, "init", "--agent", "none").returncode == 0
+    assert command(tmp_path, "prepare", "feature", "--brief", "Answer").returncode == 0
+
+    result = command(tmp_path, "check", "--json")
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["change"] == "feature"
+    assert payload["decision"] == "FAIL"

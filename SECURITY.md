@@ -30,7 +30,10 @@ The repository workflows use read-only repository permissions, pinned action rev
 
 The optional adopting-project workflow requires a current, committed review packet, current domain and technical approvals, a passing grader audit, and fresh candidate evidence; it does not create approval during CI. Consolidated reports and raw evidence are separate, opt-in uploads. Required checks and actual PR approvals remain repository settings managed by the adopter. Provider-backed evaluations require a separately reviewed credential arrangement; missing credentials must remain a non-passing evaluation outcome.
 
-The release-artifact workflow checks and builds distributions for manual inspection. It does not publish to a package index, create a GitHub release, or deploy an application.
+The release-artifact workflow checks and builds distributions for manual inspection. It does not
+publish, create a GitHub release, or deploy an application. The separate tag-triggered publish
+workflow receives an OIDC publishing identity only in its final `pypi` environment job, after the
+tagged revision passes CI and the built distributions pass an isolated tool-install smoke test.
 
 ## Reporting a vulnerability
 

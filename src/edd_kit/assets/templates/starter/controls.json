@@ -1,0 +1,32 @@
+[
+  {
+    "id": "example-good",
+    "requirement_id": "example-acknowledgement",
+    "input": "Return the example acknowledgement.",
+    "actual_output": "Example acknowledged.",
+    "expected_output": "Example acknowledged.",
+    "expected_pass": true,
+    "case_id": "example-acknowledgement",
+    "rationale": "Confirms the grader accepts the declared reference answer.",
+    "contributed_by": "EDD starter fixture",
+    "independent": true,
+    "source": "Unreviewed synthetic starter; replace with domain-reviewed examples.",
+    "reviewed_by": null,
+    "partition": "validation"
+  },
+  {
+    "id": "example-bad",
+    "requirement_id": "example-acknowledgement",
+    "input": "Return the example acknowledgement.",
+    "actual_output": "Feature not implemented.",
+    "expected_output": "Example acknowledged.",
+    "expected_pass": false,
+    "case_id": "example-acknowledgement",
+    "rationale": "Checks that a plausible unsupported success response is rejected.",
+    "contributed_by": "EDD starter fixture",
+    "independent": true,
+    "source": "Unreviewed synthetic starter; replace with domain-reviewed examples.",
+    "reviewed_by": null,
+    "partition": "validation"
+  }
+]

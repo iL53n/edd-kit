@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "change": "invoice-extraction",
+  "title": "Extract explicit invoice total and supported currency without inventing absent fields",
+  "suite": "suite.py:build_suite",
+  "artifacts": [],
+  "requirements": [
+    {
+      "id": "output-schema",
+      "description": "Output is exactly a JSON object with currency USD/EUR/null and total a decimal string with exactly two places or null",
+      "critical": true,
+      "pass_rate": 1,
+      "min_cases": 3
+    },
+    {
+      "id": "correct-currency",
+      "description": "Return the explicit supported invoice currency; absent, unsupported or conflicting currency is null",
+      "critical": true,
+      "pass_rate": 1,
+      "min_cases": 3
+    },
+    {
+      "id": "correct-total",
+      "description": "Return only an explicitly labelled Total, not Subtotal or Amount due; absent or conflicting totals are null",
+      "critical": true,
+      "pass_rate": 1,
+      "min_cases": 3
+    }
+  ],
+  "profiles": {
+    "dev": {
+      "trials": 1,
+      "grader_repetitions": 1,
+      "max_observations": 100,
+      "max_cost_usd": 0,
+      "timeout_seconds": 60
+    },
+    "acceptance": {
+      "trials": 1,
+      "grader_repetitions": 1,
+      "max_observations": 200,
+      "max_cost_usd": 0,
+      "timeout_seconds": 120
+    }
+  },
+  "evaluator_env": [],
+  "targets": {
+    "candidate": {
+      "kind": "application",
+      "command": [
+        "python3",
+        "targets/invoice-extraction/candidate.py"
+      ],
+      "files": [
+        "targets/invoice-extraction/candidate.py"
+      ],
+      "env": [],
+      "timeout_seconds": 10
+    },
+    "stub": {
+      "kind": "stub",
+      "command": [
+        "python3",
+        "targets/invoice-extraction/stub.py"
+      ],
+      "files": [
+        "targets/invoice-extraction/stub.py"
+      ],
+      "env": [],
+      "timeout_seconds": 10
+    }
+  }
+}

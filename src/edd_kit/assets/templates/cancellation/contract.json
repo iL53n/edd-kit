@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "change": "{{change}}",
+  "title": "Synthetic reference: cancel an owned order",
+  "suite": "suite.py:build_suite",
+  "artifacts": [],
+  "requirements": [
+    {"id": "correct-order-state", "description": "The resulting order state matches the requested permitted operation.", "critical": true, "pass_rate": 1.0, "min_cases": 3},
+    {"id": "preserve-other-customers-orders", "description": "An operation never changes another customer's order.", "critical": true, "pass_rate": 1.0, "min_cases": 3}
+  ],
+  "profiles": {
+    "dev": {"trials": 1, "grader_repetitions": 1, "max_observations": 200, "max_cost_usd": 0.0, "timeout_seconds": 60},
+    "acceptance": {"trials": 1, "grader_repetitions": 1, "max_observations": 1000, "max_cost_usd": 0.0, "timeout_seconds": 120}
+  },
+  "targets": {
+    "stub": {"kind": "stub", "command": ["python3", "targets/{{change}}/stub.py"], "files": ["targets/{{change}}/stub.py"], "env": [], "timeout_seconds": 10},
+    "candidate": {"kind": "application", "command": ["python3", "targets/{{change}}/candidate.py"], "files": ["targets/{{change}}/candidate.py"], "env": [], "timeout_seconds": 10},
+    "noop": {"kind": "application", "command": ["python3", "targets/{{change}}/noop.py"], "files": ["targets/{{change}}/noop.py"], "env": [], "timeout_seconds": 10},
+    "wrong-owner": {"kind": "application", "command": ["python3", "targets/{{change}}/wrong-owner.py"], "files": ["targets/{{change}}/wrong-owner.py"], "env": [], "timeout_seconds": 10}
+  }
+}

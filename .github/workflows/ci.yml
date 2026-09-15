@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+  DEEPEVAL_TELEMETRY_OPT_OUT: "YES"
+  DEEPEVAL_DISABLE_DOTENV: "1"
+  PYTHONUNBUFFERED: "1"
+  UV_NO_PROGRESS: "1"
+
+jobs:
+  quality:
+    name: Lint and types
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version-file: uv.lock
+          python-version: "3.12"
+          enable-cache: false
+      - name: Install locked environment
+        run: uv sync --locked --extra deepeval --group dev
+      - name: Lint
+        run: uv run --no-sync ruff check src tests scripts
+      - name: Check formatting
+        run: uv run --no-sync ruff format --check src tests scripts
+      - name: Check types
+        run: uv run --no-sync mypy src/edd_kit
+      - name: Verify packaged evaluator lock matches the project lock
+        shell: bash
+        run: |
+          uv export --locked --extra deepeval --no-dev --no-emit-project --no-header --no-annotate --quiet \
+            | diff -u - <(tail -n +2 src/edd_kit/assets/requirements-eval.lock)
+
+  test:
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version-file: uv.lock
+          python-version: ${{ matrix.python }}
+          enable-cache: false
+      - name: Install locked environment
+        run: uv sync --locked --extra deepeval --group dev
+      - name: Run tests without provider credentials
+        run: uv run --no-sync python -m pytest --junitxml=test-results/pytest.xml
+      - name: Retain test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tests-${{ matrix.os }}-py${{ matrix.python }}
+          path: test-results/pytest.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+  package:
+    name: Distribution smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version-file: uv.lock
+          python-version: "3.12"
+          enable-cache: false
+      - name: Install locked build and runtime dependencies
+        run: uv sync --locked --extra deepeval --group dev
+      - name: Build source and wheel distributions
+        run: uv run --no-sync python -m build --no-isolation
+      - name: Validate distribution metadata
+        run: uv run --no-sync python -m twine check --strict dist/*
+      - name: Install the wheel over the editable package
+        run: uv pip install --python .venv/bin/python --reinstall --no-deps dist/*.whl
+      - name: Exercise packaged resources from outside the checkout
+        run: |
+          uv run --no-sync python -I - <<'PY'
+          import importlib.resources
+          from pathlib import Path
+          import subprocess
+          import sys
+          import tempfile
+
+          import edd_kit
+
+          if Path(edd_kit.__file__).resolve().is_relative_to(Path.cwd() / "src"):
+              raise SystemExit("Smoke test imported source instead of the installed wheel")
+          assets = importlib.resources.files("edd_kit").joinpath("assets")
+          for skill in ("edd-prepare", "edd-build", "edd-check"):
+              assert assets.joinpath("skills", skill, "SKILL.md").read_text()
+          assert assets.joinpath("skills", "edd-prepare", "references", "authoring.md").read_text()
+          for template in ("starter", "cancellation"):
+              for filename in ("contract.json", "suite.py"):
+                  assert assets.joinpath("templates", template, filename).read_text()
+          assert assets.joinpath("ci", "edd.yml").read_text()
+
+          executable = str(Path(sys.executable).parent / "edd")
+          with tempfile.TemporaryDirectory(prefix="edd-wheel-") as root:
+              for arguments in (
+                  ["--help"],
+                  ["init", "--agent", "codex"],
+                  ["prepare", "wheel-smoke", "--brief", "Synthetic wheel smoke test", "--template", "cancellation"],
+                  ["inspect", "wheel-smoke", "--json"],
+              ):
+                  subprocess.run([executable, *arguments], cwd=root, check=True, timeout=60)
+              installed = Path(root) / ".agents" / "skills"
+              assert (installed / "edd-prepare" / "references" / "authoring.md").is_file()
+          PY
+      - name: Exercise complete installed workflow
+        # Full behavior is exercised through the installed package, outside the checkout.
+        # Synthetic review declarations here refer only to bundled worked examples.
+        if: ${{ success() }}
+        run: uv run --no-sync python scripts/smoke_distribution.py --python "$GITHUB_WORKSPACE/.venv/bin/python"
+      - name: Exercise independently authored new-project and existing-app fixtures
+        # Independent domain fixtures complement the bundled cancellation demonstration.
+        # Synthetic test review never stands in for an adopter's human review.
+        run: uv run --no-sync python scripts/smoke_examples.py --python "$GITHUB_WORKSPACE/.venv/bin/python"
+      - name: Retain checked distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: distributions-${{ github.sha }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  required:
+    name: Required checks
+    if: ${{ always() }}
+    needs: [quality, test, package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      QUALITY_RESULT: ${{ needs.quality.result }}
+      TEST_RESULT: ${{ needs.test.result }}
+      PACKAGE_RESULT: ${{ needs.package.result }}
+    steps:
+      - name: Require every check to succeed
+        run: |
+          test "$QUALITY_RESULT" = success
+          test "$TEST_RESULT" = success
+          test "$PACKAGE_RESULT" = success

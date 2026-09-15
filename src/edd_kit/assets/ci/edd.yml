@@ -1,0 +1,81 @@
+# Copy to .github/workflows/edd.yml in the adopting repository.
+# Call from its existing pull_request workflow with explicit change/target inputs.
+# Prerequisites: commit edd.toml, the prepared pipeline, REVIEW.md and review.json,
+# plus pyproject.toml/uv.lock with edd-kit[deepeval] in an "eval" dependency group.
+# The review log records prior domain and technical decisions; CI does not create approval.
+name: EDD acceptance
+
+on:
+  workflow_call:
+    inputs:
+      change:
+        description: Prepared change ID
+        required: true
+        type: string
+      target:
+        description: Application target in the change contract
+        default: candidate
+        type: string
+      upload-evidence:
+        description: Retain raw local evaluation data as a GitHub artifact
+        default: false
+        type: boolean
+      upload-report:
+        description: Retain the consolidated reviewer report as a GitHub artifact
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    name: EDD acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      EDD_CHANGE: ${{ inputs.change }}
+      EDD_TARGET: ${{ inputs.target }}
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+      DEEPEVAL_TELEMETRY_OPT_OUT: "YES"
+      DEEPEVAL_DISABLE_DOTENV: "1"
+      UV_NO_PROGRESS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.14"
+          python-version: "3.12"
+          enable-cache: false
+      - name: Install the adopting project's locked evaluation environment
+        run: uv sync --locked --group eval
+      - name: Inspect the prepared suite
+        id: inspect
+        run: uv run --no-sync edd inspect "$EDD_CHANGE" --json
+      - name: Run fresh acceptance and write the consolidated report
+        if: ${{ !cancelled() && steps.inspect.outcome == 'success' }}
+        run: >-
+          uv run --no-sync edd check "$EDD_CHANGE"
+          --target "$EDD_TARGET"
+          --report-dir ".edd/$EDD_CHANGE/report"
+          --revision "$GITHUB_SHA"
+      - name: Retain the consolidated reviewer report when requested
+        if: ${{ !cancelled() && inputs.upload-report }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: edd-report-${{ inputs.change }}-${{ inputs.target }}-${{ github.run_attempt }}
+          path: .edd/${{ inputs.change }}/report/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain evaluation evidence when requested
+        if: ${{ !cancelled() && inputs.upload-evidence }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: edd-evidence-${{ inputs.change }}-${{ inputs.target }}-${{ github.run_attempt }}
+          path: .edd/${{ inputs.change }}/runs/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7

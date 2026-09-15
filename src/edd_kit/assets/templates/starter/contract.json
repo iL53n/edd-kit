@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "change": "{{change}}",
+  "title": "Unreviewed starter: replace the example behavior",
+  "suite": "suite.py:build_suite",
+  "artifacts": [],
+  "requirements": [
+    {
+      "id": "example-acknowledgement",
+      "description": "EXAMPLE ONLY: return the fixed acknowledgement. Replace this criterion before reviewing.",
+      "critical": true,
+      "pass_rate": 1.0,
+      "min_cases": 1
+    }
+  ],
+  "profiles": {
+    "dev": {"trials": 1, "grader_repetitions": 1, "max_observations": 200, "max_cost_usd": 0.0, "timeout_seconds": 60},
+    "acceptance": {"trials": 1, "grader_repetitions": 1, "max_observations": 1000, "max_cost_usd": 0.0, "timeout_seconds": 120}
+  },
+  "targets": {
+    "stub": {"kind": "stub", "command": ["python3", "targets/{{change}}/stub.py"], "files": ["targets/{{change}}/stub.py"], "env": [], "timeout_seconds": 10},
+    "candidate": {"kind": "application", "command": ["python3", "targets/{{change}}/candidate.py"], "files": ["targets/{{change}}/candidate.py"], "env": [], "timeout_seconds": 10}
+  }
+}

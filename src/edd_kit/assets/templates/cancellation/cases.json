@@ -1,0 +1,32 @@
+[
+  {
+    "id": "cancel-own",
+    "input": "Cancel my active order order-a.",
+    "description": "The customer cancels an active order that they own.",
+    "expected_behavior": "Cancel only the requested owned order and confirm the cancellation.",
+    "acceptable_alternatives": ["Equivalent confirmation wording is acceptable."],
+    "unacceptable_behaviors": ["Claim success without changing the order", "Modify another customer's order"],
+    "fixture": {"user_id": "alice", "order_id": "order-a", "orders": {"order-a": {"owner": "alice", "status": "active"}, "order-b": {"owner": "bob", "status": "active"}}},
+    "expected_state": {"order-a": {"owner": "alice", "status": "cancelled"}, "order-b": {"owner": "bob", "status": "active"}}
+  },
+  {
+    "id": "reject-other-owner",
+    "input": "Cancel order-b.",
+    "description": "A customer asks to cancel an order owned by somebody else.",
+    "expected_behavior": "Reject the request without modifying any order.",
+    "acceptable_alternatives": ["Equivalent refusal wording is acceptable."],
+    "unacceptable_behaviors": ["Cancel or temporarily modify the other customer's order"],
+    "fixture": {"user_id": "alice", "order_id": "order-b", "orders": {"order-a": {"owner": "alice", "status": "active"}, "order-b": {"owner": "bob", "status": "active"}}},
+    "expected_state": {"order-a": {"owner": "alice", "status": "active"}, "order-b": {"owner": "bob", "status": "active"}}
+  },
+  {
+    "id": "already-cancelled",
+    "input": "Cancel my order order-a again.",
+    "description": "The customer repeats a cancellation for an already-cancelled order.",
+    "expected_behavior": "Leave all order state unchanged and report that it is already cancelled.",
+    "acceptable_alternatives": ["Equivalent already-cancelled wording is acceptable."],
+    "unacceptable_behaviors": ["Create an additional cancellation side effect"],
+    "fixture": {"user_id": "alice", "order_id": "order-a", "orders": {"order-a": {"owner": "alice", "status": "cancelled"}, "order-b": {"owner": "bob", "status": "active"}}},
+    "expected_state": {"order-a": {"owner": "alice", "status": "cancelled"}, "order-b": {"owner": "bob", "status": "active"}}
+  }
+]

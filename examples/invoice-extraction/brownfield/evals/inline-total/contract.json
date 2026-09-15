@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "change": "inline-total",
+  "title": "Support explicit inline USD/EUR and grouped Total without changing legacy behavior",
+  "suite": "suite.py:build_suite",
+  "artifacts": [
+    "REQUEST.md"
+  ],
+  "requirements": [
+    {
+      "id": "output-schema",
+      "description": "Exactly currency USD/EUR/null and total a two-decimal string/null",
+      "critical": true,
+      "pass_rate": 1,
+      "min_cases": 2
+    },
+    {
+      "id": "correct-currency",
+      "description": "Return explicitly labelled USD/EUR including the new inline Total convention; conflicts/absence are null",
+      "critical": true,
+      "pass_rate": 1,
+      "min_cases": 2
+    },
+    {
+      "id": "correct-total",
+      "description": "Return the ungrouped exact explicitly labelled Total; retain existing format; absence/conflict null; never use Subtotal",
+      "critical": true,
+      "pass_rate": 1,
+      "min_cases": 2
+    }
+  ],
+  "profiles": {
+    "dev": {
+      "trials": 1,
+      "grader_repetitions": 1,
+      "max_observations": 100,
+      "max_cost_usd": 0,
+      "timeout_seconds": 60
+    },
+    "acceptance": {
+      "trials": 1,
+      "grader_repetitions": 1,
+      "max_observations": 100,
+      "max_cost_usd": 0,
+      "timeout_seconds": 120
+    }
+  },
+  "evaluator_env": [],
+  "targets": {
+    "current": {
+      "kind": "application",
+      "command": [
+        "python3",
+        "app/target.py"
+      ],
+      "files": [
+        "app/target.py"
+      ],
+      "env": [],
+      "timeout_seconds": 10
+    }
+  }
+}

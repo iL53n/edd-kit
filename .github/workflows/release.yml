@@ -1,0 +1,28 @@
+name: Release artifact check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-artifacts-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check and build the selected revision
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+  ready:
+    name: Artifacts ready for review
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Explain the result
+        run: |
+          echo "The selected revision passed CI and its checked wheel and sdist are workflow artifacts." >> "$GITHUB_STEP_SUMMARY"
+          echo "This workflow does not publish packages, create a release, or deploy an application." >> "$GITHUB_STEP_SUMMARY"

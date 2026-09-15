@@ -1,0 +1,8 @@
+[
+  {"id":"inline-usd","input":"Invoice B-1\nTotal: USD 1,234.56\n","expected":{"currency":"USD","total":"1234.56"},"profiles":["dev","acceptance"]},
+  {"id":"inline-eur","input":"Invoice B-2\nTotal: EUR 2,345.60\n","expected":{"currency":"EUR","total":"2345.60"},"profiles":["dev","acceptance"]},
+  {"id":"legacy-separate-currency","input":"Invoice B-3\nCurrency: USD\nSubtotal: 10.00\nTotal: 12.50\n","expected":{"currency":"USD","total":"12.50"},"profiles":["dev","acceptance"]},
+  {"id":"subtotal-only","input":"Invoice B-4\nSubtotal: USD 1,234.56\nFinal amount has not been issued.\n","expected":{"currency":null,"total":null},"profiles":["dev","acceptance"]},
+  {"id":"conflicting-inline-totals","input":"Invoice B-5\nTotal: USD 1,234.56\nTotal: USD 1,234.57\nNeither line supersedes the other.\n","expected":{"currency":"USD","total":null},"profiles":["acceptance"]},
+  {"id":"inline-unicode-footer","input":"Invoice B-6\r\nVendor: Łódź Design\r\nSubtotal: EUR 2,000.00\r\nNotes: Preserve these notes and the complete footer.\r\nTotal: EUR 2,460.00\r\nThank you.  \r\n","expected":{"currency":"EUR","total":"2460.00"},"profiles":["acceptance"]}
+]

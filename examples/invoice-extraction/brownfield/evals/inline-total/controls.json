@@ -1,0 +1,10 @@
+[
+  {"id":"schema-positive","case_id":"inline-usd","requirement_id":"output-schema","actual_output":"{\"total\":\"1234.56\",\"currency\":\"USD\"}","expected_pass":true,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"},
+  {"id":"schema-number-negative","case_id":"inline-usd","requirement_id":"output-schema","actual_output":"{\"total\":1234.56,\"currency\":\"USD\"}","expected_pass":false,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"},
+  {"id":"currency-positive","case_id":"inline-eur","requirement_id":"correct-currency","actual_output":"{\"total\":\"2345.60\",\"currency\":\"EUR\"}","expected_pass":true,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"},
+  {"id":"currency-missing-negative","case_id":"inline-eur","requirement_id":"correct-currency","actual_output":"{\"total\":\"2345.60\",\"currency\":null}","expected_pass":false,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"},
+  {"id":"total-positive","case_id":"inline-usd","requirement_id":"correct-total","actual_output":"{\"total\":\"1234.56\",\"currency\":\"USD\"}","expected_pass":true,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"},
+  {"id":"decimal-position-negative","case_id":"inline-usd","requirement_id":"correct-total","actual_output":"{\"total\":\"123456.00\",\"currency\":\"USD\"}","expected_pass":false,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"},
+  {"id":"absent-total-positive","case_id":"subtotal-only","requirement_id":"correct-total","actual_output":"{\"total\":null,\"currency\":null}","expected_pass":true,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"},
+  {"id":"subtotal-substitution-negative","case_id":"subtotal-only","requirement_id":"correct-total","actual_output":"{\"total\":\"1234.56\",\"currency\":null}","expected_pass":false,"partition":"validation","reviewed_by":"EDD synthetic brownfield workflow test"}
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "example-acknowledgement",
+    "input": "Return the example acknowledgement.",
+    "expected_output": "Example acknowledged.",
+    "description": "A user requests the example acknowledgement",
+    "expected_behavior": "Return the exact acknowledgement text",
+    "acceptable_alternatives": [],
+    "unacceptable_behaviors": ["Return a placeholder or claim success without the acknowledgement"],
+    "requirements": ["example-acknowledgement"],
+    "fixture": {}
+  }
+]

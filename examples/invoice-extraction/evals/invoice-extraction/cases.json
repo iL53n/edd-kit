@@ -1,0 +1,14 @@
+[
+  {"id":"usd-total-not-subtotal","input":"Invoice INV-1001\nFrom: Northwind Design\nTo: Example Client\nCurrency: USD\nServices: 80.00\nSubtotal: 80.00\nTax: 4.00\nTotal: 84.00\nPlease retain this complete invoice for your records.\n","expected":{"currency":"USD","total":"84.00"},"profiles":["dev","acceptance"]},
+  {"id":"eur-fractional-format","input":"Invoice INV-1002\nCurrency: EUR\nDescription: Translation services\nTotal: 39.5\nPayment due in 14 days.\n","expected":{"currency":"EUR","total":"39.50"},"profiles":["dev","acceptance"]},
+  {"id":"subtotal-without-total","input":"Invoice INV-1003\nCurrency: USD\nSubtotal: 20.00\nThis draft has no final total.\n","expected":{"currency":"USD","total":null},"profiles":["dev","acceptance"]},
+  {"id":"total-without-currency","input":"Invoice INV-1004\nVendor: Example Studio\nTotal: 18.00\nCurrency not supplied.\n","expected":{"currency":null,"total":"18.00"},"profiles":["dev","acceptance"]},
+  {"id":"conflicting-totals","input":"Invoice INV-1005\nCurrency: EUR\nTotal: 10.00\nTotal: 11.00\nNeither amount is identified as superseding the other.\n","expected":{"currency":"EUR","total":null},"profiles":["dev","acceptance"]},
+  {"id":"conflicting-currencies","input":"Invoice INV-1006\nCurrency: USD\nCurrency: EUR\nTotal: 11.00\nNeither currency is identified as the correct one.\n","expected":{"currency":null,"total":"11.00"},"profiles":["dev","acceptance"]},
+  {"id":"no-fields","input":"Invoice INV-1007\nVendor: Example Studio\nAddress: 12 Example Road\nDescription: Services to be priced later.\n","expected":{"currency":null,"total":null},"profiles":["acceptance"]},
+  {"id":"zero-is-not-absent","input":"Invoice INV-1008\nCurrency: USD\nSubtotal: 5.00\nDiscount: 5.00\nTotal: 0.00\n","expected":{"currency":"USD","total":"0.00"},"profiles":["acceptance"]},
+  {"id":"unsupported-currency","input":"Invoice INV-1009\nCurrency: GBP\nTotal: 15.00\n","expected":{"currency":null,"total":"15.00"},"profiles":["acceptance"]},
+  {"id":"amount-due-is-not-labelled-total","input":"Invoice INV-1010\nCurrency: EUR\nAmount due: 40.00\nAn explicitly labelled Total is absent.\n","expected":{"currency":"EUR","total":null},"profiles":["acceptance"]},
+  {"id":"integer-total","input":"Invoice INV-1011\nCurrency: USD\nTotal: 7\n","expected":{"currency":"USD","total":"7.00"},"profiles":["acceptance"]},
+  {"id":"full-source-crlf-unicode","input":"Invoice INV-1012\r\nVendor: Łódź Design\r\nCurrency: EUR\r\n\r\nLine item: layout design — 50.00\r\nSubtotal: 50.00\r\nNotes: This description is part of the original source and must be retained.\r\nNotes: The total appears after the notes; no preprocessing may drop the footer.\r\n\r\nTotal: 52.50\r\nThank you.  \r\n","expected":{"currency":"EUR","total":"52.50"},"profiles":["acceptance"]}
+]

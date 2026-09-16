@@ -4,7 +4,13 @@ EDD Kit runs evaluation code and application targets supplied by the adopting pr
 
 ## What a passing result means
 
-A passing result means the recorded observations satisfy the configured acceptance policy and its evidence requirements. It does not prove complete behavioral coverage, production reliability, or permission to deploy.
+A completed measurement means EDD produced the observations described by its report. Its separate
+behavior decision may still be `FAIL` or `INCOMPLETE`. A passing behavior result means the
+recorded observations satisfy the configured policy; it does not prove complete coverage,
+production reliability, or permission to deploy.
+
+Numeric comparison is limited to runs with the same evaluation bundle and execution profile. Even a
+valid improvement measures only the declared sample.
 
 Evaluation and target digests identify recorded inputs and detect ordinary changes. They do not authenticate the author of a run or prevent someone who can edit the evaluator, criteria, review packet, review log, or report from fabricating evidence. Committed `REVIEW.md` and `review.json` files are portable declarations of what was reviewed and decided, not signatures or substitutes for repository approval rules.
 

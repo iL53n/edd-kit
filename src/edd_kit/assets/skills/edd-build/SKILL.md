@@ -1,55 +1,46 @@
 ---
 name: edd-build
-description: Implement or resume an LLM feature from a prepared EDD evaluation pipeline, using its checked criteria and baseline to guide the development loop.
+description: Implement an LLM feature through short code-and-measure loops using a living EDD scenario set.
 ---
 
-# Build against the prepared pipeline
+# Build through measurement loops
 
-Use the existing coding agent to implement the requested feature. EDD supplies acceptance evidence and readiness checks; it does not replace the coding agent or authorize deployment.
+Use the prepared bundle as observable guidance. The cases and expectations may improve as the team learns; preserve their history and explain meaningful changes.
 
-## 1. Recover readiness
+## 1. Establish the current measurement
 
-Read the repository instructions and the selected change's contract, brief, evaluation code, and recorded progress. Run `edd status CHANGE --json` and `edd inspect CHANGE --json`. Select the change explicitly when more than one is plausible.
+Read the repository instructions, brief, contract, suite, target code, and `edd status CHANGE`. If no runnable bundle exists, use [edd-prepare](../edd-prepare/SKILL.md).
 
-Use the reported `workflow`, `diagnostics`, and first blocking `action` rather than inferring
-readiness from files existing or an old green summary. The implementation loop needs a
-feature-specific pipeline, an accepted review for its current contents, a valid control audit, and
-an honest baseline state. If preparation is missing or stale, use
-[edd-prepare](../edd-prepare/SKILL.md) to complete only the reported blocking work before production
-implementation.
-
-When editing an adapter, grader, fixture, or execution policy, read [the authoring reference](../edd-prepare/references/authoring.md). Preserve the distinction between changing target code and the evaluation bundle.
-
-Completion: the current artifacts and CLI state agree on what is being implemented, how it will be checked, and which baseline is available. Surface unmet prerequisites with the concrete corrective action.
-
-## 2. Plan and implement one behavior at a time
-
-Derive a small implementation plan from the prepared requirements and existing code. Link each behavior to its relevant cases and evidence collection. Keep progress in `.edd/CHANGE/progress.md` or the repository's existing task mechanism outside the fingerprinted evaluation artifacts. Updating task completion must not invalidate reviewed acceptance criteria. Another session resumes from these notes and current run records.
-
-Implement the smallest useful slice, preserve existing application conventions, and run the appropriate ordinary software tests. Use the configured candidate target for development feedback:
+Measure the current application before changing it when possible:
 
 ```bash
-edd run CHANGE --target TARGET --stage candidate --profile dev
+edd measure CHANGE --target TARGET --stage baseline --profile dev
 ```
 
-Inspect per-requirement evidence and execution health. Distinguish an application failure from an unavailable provider, malformed metric result, or broken fixture. A development pass supports iteration; the acceptance profile determines final acceptance.
+Record the returned run ID. A behavior `FAIL` provides a useful starting point when execution is complete.
 
-Completion for a slice: its relevant cases exercise the implementation and the observed outcomes satisfy the declared development policy, with execution gaps still visible.
+## 2. Implement and compare a small slice
 
-## 3. Handle discoveries explicitly
+Choose one behavior or failure class, implement the smallest useful change, and run the repository's ordinary tests. Then measure the candidate against the saved baseline:
 
-When implementation reveals an unclear requirement or demonstrably incorrect grader, return to the affected preparation step. Explain the proposed criterion change and its reason, preserve the original failure evidence, and refresh the affected controls, review, audit, and baseline comparison under the changed evaluation bundle.
+```bash
+edd measure CHANGE --target TARGET --stage candidate --profile dev --compare-to BASELINE_RUN_ID
+```
 
-Keep the intended acceptance behavior fixed while fixing implementation failures. Threshold reductions, relabelled goldens, and skipped cases are criterion changes, not ordinary ways to make the implementation pass. Apply only changes justified by the user's requirement or an explicit revision decision.
+Read the case-level observations and execution gaps. Use the numeric delta only when EDD reports the runs as comparable. A changed scenario set, metric, profile, fixture, or policy requires a fresh measurement of both versions for a numeric comparison.
 
-On resume, reread files and current status, check what actually changed, and continue from the first unfinished prerequisite or behavior. Preserve custom edits and previous runs. Avoid repeating paid evaluations whose current evidence already answers the development question.
+## 3. Learn from gaps
 
-## 4. Complete with acceptance evidence
+When a result exposes a distinct failure class, add a small group of focused cases, usually no more than five at once. Record why they were added and where their expectations came from. Prefer observed production or user examples; use synthetic cases to cover boundaries and rare risks.
 
-Once the implementation is ready, use [edd-check](../edd-check/SKILL.md) for a fresh acceptance run and verification. Continue fixing in-scope application failures and rerun the checks affected by each change. Stop when acceptance is established, or when an unresolved product decision, required access, or configured execution limit prevents progress.
+Show the case-set diff. If the bundle changed, keep the older runs as history and rerun both relevant application versions before claiming improvement. Deferred cases remain visible and receive no pass/fail decision until their expectation is resolved.
 
-Report the implemented behavior, candidate acceptance, baseline comparison when supported, ordinary
-test results, and remaining limitations with artifact links. End with the phase and exactly one
-next action from current status. A satisfactory result may require no application change if the
-current target already meets the contract. Keep merging, publishing, and deployment subject to the
-user's separate task scope.
+Change metrics or expectations only when evidence shows that the measurement is wrong or the product intent changed. Do not lower a threshold merely to obtain a pass.
+
+Stop and summarize after three iterations without meaningful movement. Identify whether the blocker is application behavior, evaluation quality, missing evidence, or an unresolved product decision.
+
+## 4. Finish at the required confidence level
+
+For normal development, finish with a fresh measurement report, comparable delta when available, ordinary test results, and remaining gaps. A completed measurement can report behavior `FAIL`; that means the instrument ran and found a problem.
+
+When the user explicitly requires a formal gate, continue with [edd-check](../edd-check/SKILL.md) and its strict acceptance branch.

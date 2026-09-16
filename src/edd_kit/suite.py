@@ -16,6 +16,9 @@ class Case:
     expected_behavior: str = ""
     acceptable_alternatives: tuple[str, ...] = ()
     unacceptable_behaviors: tuple[str, ...] = ()
+    source: str = "unknown"
+    expectation_source: str = "unknown"
+    deferred_reason: str | None = None
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,8 @@
-"""The persistent Prepare → Build → Check workflow behind CLI and CI callers."""
+"""Persistent behavior measurements and the optional strict acceptance workflow."""
 
 import contextlib
 import os
+import re
 import subprocess
 import tempfile
 from datetime import datetime
@@ -400,12 +401,36 @@ class Workflow:
                 else row
                 for row in observations
             ]
+        saved_requirements = (
+            record.get("bundle_identity", {})
+            .get("criteria", {})
+            .get("contract", {})
+            .get("requirements")
+        )
+        requirements = project.contract.requirements
+        if isinstance(saved_requirements, list):
+            try:
+                from .models import Requirement
+
+                requirements = [Requirement.model_validate(item) for item in saved_requirements]
+            except ValueError:
+                requirements = project.contract.requirements
         summary = decide(
-            project.contract.requirements,
+            requirements,
             record["expected_ids"],
             observations,
             audit=record["kind"] == "audit",
             gaps=record.get("inspection_gaps", record["gaps"]),
+            allow_empty=bool(
+                record["kind"] != "audit"
+                and isinstance(record.get("cases"), list)
+                and not any(
+                    record["profile"] in case.get("profiles", [])
+                    and not case.get("deferred_reason")
+                    for case in record["cases"]
+                    if isinstance(case, dict)
+                )
+            ),
         )
         summary["integrity_errors"].extend(self._plan_errors(record))
         if summary["integrity_errors"] or (
@@ -564,6 +589,242 @@ class Workflow:
             (run for run in reversed(runs) if run["kind"] in kinds and run["profile"] == profile),
             None,
         )
+
+    def run_record(self, run_id: str) -> dict:
+        """Load one validated saved run without changing project state."""
+        if not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", run_id):
+            raise ProjectError("Invalid run ID")
+        project = self.project
+        path = safe_path(
+            project.root,
+            str((project.state / "runs" / f"{run_id}.json").relative_to(project.root)),
+        )
+        if not path.is_file():
+            raise ProjectError(f"Unknown run: {run_id}")
+        record = read_record(path)
+        self._validate_run(record, path)
+        if record["kind"] == "baseline-unavailable":
+            record["decision"] = "UNAVAILABLE"
+        else:
+            record.update(self._summarize(project, record))
+        return record
+
+    @staticmethod
+    def _case_changes(before: dict, after: dict) -> dict:
+        def indexed(run: dict) -> dict[str, dict]:
+            return {
+                row["case_id"]: row
+                for row in run.get("cases", [])
+                if isinstance(row, dict) and isinstance(row.get("case_id"), str)
+            }
+
+        old, new = indexed(before), indexed(after)
+        shared = old.keys() & new.keys()
+        return {
+            "added": sorted(new.keys() - old.keys()),
+            "removed": sorted(old.keys() - new.keys()),
+            "changed": sorted(key for key in shared if old[key] != new[key]),
+        }
+
+    def compare_runs(self, before_id: str, after_id: str) -> dict:
+        before, after = self.run_record(before_id), self.run_record(after_id)
+        allowed_kinds = {"baseline", "candidate", "baseline-unavailable"}
+        if before["kind"] not in allowed_kinds or after["kind"] not in allowed_kinds:
+            raise ProjectError("Only application measurements can be compared")
+        changes = self._case_changes(before, after)
+        comparison: dict[str, Any]
+        if (
+            before.get("kind") == "baseline-unavailable"
+            or after.get("kind") == "baseline-unavailable"
+        ):
+            comparison = {
+                "status": "unavailable",
+                "reason": "An unavailable-baseline declaration has no observations to compare",
+            }
+        elif before["profile"] != after["profile"]:
+            comparison = {"status": "unavailable", "reason": "Execution profiles differ"}
+        elif before["bundle_digest"] != after["bundle_digest"]:
+            comparison = {
+                "status": "unavailable",
+                "reason": "Evaluation bundles differ; rerun both targets with the current bundle",
+            }
+        else:
+            comparison = self._compare(before, after)
+        comparison.update(
+            {
+                "schema_version": 1,
+                "kind": "measurement-comparison",
+                "change": self.change,
+                "before_run_id": before_id,
+                "after_run_id": after_id,
+                "case_changes": changes,
+            }
+        )
+        if comparison["status"] == "comparable":
+            old_rows = {row["id"]: row for row in before["observations"]}
+            new_rows = {row["id"]: row for row in after["observations"]}
+            comparison["changed_observations"] = [
+                {
+                    "id": identity,
+                    "case_id": new_rows[identity]["case_id"],
+                    "requirement_id": new_rows[identity]["requirement_id"],
+                    "before_passed": old_rows[identity].get("passed"),
+                    "after_passed": new_rows[identity].get("passed"),
+                    "before_score": old_rows[identity].get("score"),
+                    "after_score": new_rows[identity].get("score"),
+                }
+                for identity in before["expected_ids"]
+                if old_rows.get(identity, {}).get("passed")
+                != new_rows.get(identity, {}).get("passed")
+                or old_rows.get(identity, {}).get("score")
+                != new_rows.get(identity, {}).get("score")
+            ]
+        return comparison
+
+    def measurement_report(
+        self,
+        run: dict,
+        *,
+        comparison: dict | None = None,
+        application_revision: str | None = None,
+    ) -> dict:
+        from .reporting import build_measurement_report
+
+        return build_measurement_report(
+            self.project,
+            run=run,
+            comparison=comparison,
+            application_revision=application_revision,
+        )
+
+    def measure(
+        self,
+        target: str,
+        *,
+        stage: Literal["baseline", "candidate"] = "candidate",
+        profile: str = "dev",
+        allow_paid: bool = False,
+        compare_to: str | None = None,
+        report_dir: str | None = None,
+        application_revision: str | None = None,
+    ) -> dict:
+        run = self.run(target, stage=stage, profile=profile, allow_paid=allow_paid)
+        comparison = self.compare_runs(compare_to, run["id"]) if compare_to else None
+        report = self.measurement_report(
+            run, comparison=comparison, application_revision=application_revision
+        )
+        directory = report_dir or str(
+            (self.project.state / "measurements" / run["id"]).relative_to(self.project.root)
+        )
+        paths = self.write_measurement_report(directory, report)
+        return {**report, "report_paths": paths}
+
+    def write_measurement_report(self, directory: str, report: dict) -> dict[str, str]:
+        from .reporting import write_report_bundle
+
+        return write_report_bundle(self.project, directory, report)
+
+    def measurement_status(self) -> dict:
+        project = self.project
+        inspection = self.inspect(profile="dev")
+        runs = [
+            run
+            for run in self._runs(project)
+            if run["kind"] in {"baseline", "candidate"} and run["profile"] == "dev"
+        ]
+        latest = runs[-1] if runs else None
+        current = bool(
+            latest
+            and latest["bundle_digest"] == project.bundle_digest()
+            and self._target_current(project, latest)
+        )
+        execution_status = self._measurement_execution_status(latest) if latest else None
+        runnable_cases = [row for row in inspection["cases"] if not row.get("deferred_reason")]
+        if inspection["execution_errors"] or not runnable_cases:
+            phase, state = "prepare", "needs-attention"
+            summary = "The measurement pipeline needs a runnable scenario"
+            action = {
+                "id": "prepare-measurement",
+                "actor": "agent",
+                "label": "Prepare the first runnable measurement",
+                "chat": f"$edd-prepare {self.change}",
+            }
+        elif not current:
+            phase, state = "measure", "ready"
+            summary = "The scenario set is ready for a fresh measurement"
+            action = {
+                "id": "run-measurement",
+                "actor": "cli",
+                "label": "Run the current application",
+                "command": f"edd measure {self.change} --target TARGET",
+            }
+        elif execution_status in {"ERROR", "INCONCLUSIVE"}:
+            phase, state = "measure", "needs-attention"
+            summary = f"The latest measurement is {execution_status.lower()}"
+            action = {
+                "id": "repair-measurement",
+                "actor": "agent",
+                "label": "Inspect and resolve incomplete measurement evidence",
+                "chat": f"$edd-check {self.change}",
+            }
+        elif latest and latest["kind"] == "baseline":
+            phase, state = "improve", "measured"
+            summary = "The starting behavior is measured and ready to improve"
+            action = {
+                "id": "build-candidate",
+                "actor": "agent",
+                "label": "Implement the next behavior slice and measure the candidate",
+                "chat": f"$edd-build {self.change}",
+            }
+        elif latest and latest["decision"] == "PASS":
+            phase, state = "measure", "measured"
+            summary = "The latest measurement completed with all declared checks passing"
+            action = {
+                "id": "inspect-or-extend",
+                "actor": "agent",
+                "label": "Inspect results or extend scenarios when new evidence appears",
+                "chat": f"$edd-check {self.change}",
+            }
+        else:
+            phase, state = "improve", "measured"
+            summary = "The latest measurement found behavior to improve"
+            action = {
+                "id": "improve-candidate",
+                "actor": "agent",
+                "label": "Improve the application from the measured failures",
+                "chat": f"$edd-build {self.change}",
+            }
+        return {
+            "schema_version": 2,
+            "mode": "measurement",
+            "change": self.change,
+            "criteria_digest": project.criteria_digest(),
+            "scenario_count": len(inspection["cases"]),
+            "deferred_count": sum(bool(row.get("deferred_reason")) for row in inspection["cases"]),
+            "latest_measurement": (
+                {
+                    **self._run_status(latest, project.bundle_digest(), current=current),
+                    "execution_status": execution_status,
+                    "behavior_decision": latest["decision"],
+                }
+                if latest
+                else {"status": "missing"}
+            ),
+            "workflow": {"phase": phase, "state": state, "summary": summary},
+            "actions": [action],
+            "acceptance": {
+                "optional": True,
+                "command": f"edd status {self.change} --acceptance",
+            },
+        }
+
+    @staticmethod
+    def _measurement_execution_status(run: dict) -> str:
+        if run.get("execution_errors") or run.get("integrity_errors") or run.get("errors"):
+            return "ERROR"
+        if run.get("missing") or run.get("gaps"):
+            return "INCONCLUSIVE"
+        return "COMPLETE"
 
     def _review(self, project: Project) -> dict:
         return review_state(project, load_review(project))

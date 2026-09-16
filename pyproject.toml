@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "edd-kit"
 version = "0.1.0"
-description = "Prepare executable acceptance criteria before implementing LLM features."
+description = "Measure and improve LLM feature behavior with coding agents."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"

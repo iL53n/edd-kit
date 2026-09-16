@@ -7,6 +7,9 @@
     "expected_behavior": "Return the exact acknowledgement text",
     "acceptable_alternatives": [],
     "unacceptable_behaviors": ["Return a placeholder or claim success without the acknowledgement"],
+    "source": "synthetic",
+    "expectation_source": "unreviewed EDD starter fixture",
+    "deferred_reason": null,
     "requirements": ["example-acknowledgement"],
     "fixture": {}
   }

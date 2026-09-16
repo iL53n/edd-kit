@@ -1,166 +1,143 @@
-# Generate the checks before building the feature
+# Develop through measurement
 
-EDD uses your coding agent to author an executable evaluation pipeline, then uses a local CLI and DeepEval to run it. The pipeline covers the requested behavior in a new or existing application. You can start without an existing evaluation suite.
+EDD uses coding-agent skills for authoring and a local CLI for repeatable execution. The first goal
+is useful feedback, not a complete specification.
 
-## Terminal setup, then agent skills
-
-Initialize the repository in your terminal:
+## 1. Initialize once
 
 ```bash
 edd init --agent codex
 ```
 
-Use `--agent claude` for Claude Code or `--agent none` to use the CLI without installed skills. Initialization prints the installed files and the appropriate invocation for your agent. It does not generate your feature's acceptance criteria.
+Use `--agent claude` for Claude Code or `--agent none` for direct CLI use. Restart the agent
+session after skills are installed.
 
-In Codex chat, use:
+## 2. Prepare a small measurement bundle
+
+In agent chat:
 
 ```text
 $edd-prepare Add an assistant that cancels an eligible order owned by the user.
-$edd-build <change>
-$edd-check <change>
 ```
 
-The preparation skill generates evaluation code and supporting fixtures before production feature code. The build skill implements against that pipeline. The check skill runs fresh acceptance evaluations and explains the evidence. A request to complete a feature can carry the whole workflow forward once required product decisions are resolved.
+The agent reuses existing specifications and repository context, then creates:
 
-## What preparation produces
+- a short behavior brief and stable requirements;
+- a small, diverse scenario set;
+- expected behavior and provenance;
+- native DeepEval metrics;
+- fixtures and target adapters.
 
-Bring the behavior you want, relevant product specifications, and any known edge cases. In an existing application, point the agent at the area being changed; you do not need to document the rest of the codebase.
+Aim for roughly 10–20 initial cases when useful, but do not treat the number as proof of coverage.
+Real traces and reviewed examples provide stronger domain evidence. Synthetic cases are useful for
+boundaries and rare risks. Cases with unresolved expectations remain deferred and visible.
 
-The agent creates a change with:
-
-- A contract identifying the required outcomes, constraints, acceptance policy, and evidence needed.
-- Native DeepEval cases, metric factories, and reference outcomes suited to the behavior.
-- Good and bad controls that check the graders themselves, including legitimate alternatives.
-- Fixtures, adapters, and an executable baseline target or an explicit record that a meaningful baseline is unavailable.
-- Development and acceptance execution profiles and the files needed for local and CI checks.
-
-Goldens describe acceptable outcomes; they need not be exact answer strings. A stateful feature may need authoritative state and action history alongside the assistant's response. Generated labels have recorded sources and remain proposed until reviewed.
-
-The terminal scaffold command is available directly:
+The equivalent terminal scaffold is:
 
 ```bash
-edd prepare cancellation --brief "Cancel an eligible order owned by the user" --template starter
+edd prepare CHANGE --brief "Intended behavior"
+edd inspect CHANGE --json
 ```
 
-This creates starting files. The agent must adapt them to the feature and validate the resulting pipeline. The cancellation template is a separate synthetic demonstration, not evidence about your application's correctness.
+The scaffold is a draft; it cannot infer domain correctness from the brief.
 
-## Read workflow status
-
-`edd status` shows all changes grouped by Prepare, Build, Check, and Complete. For one change,
-`edd status CHANGE` leads with its phase, progress, responsible actor, and one next action. Add
-`--verbose` for the underlying evidence decision and diagnostics.
-
-Agents and CI should use `--json`. The existing review, audit, baseline, candidate, decision, and
-exit-code fields remain authoritative. The additive `workflow`, `diagnostics`, and `actions` fields
-provide the same guidance as the human view; diagnostic codes are stable identifiers while message
-text may improve between releases.
-
-## Review the pipeline, then implement
-
-Preparation validates configuration, produces the specialist packet, records domain approval, runs
-the control audit, records technical validation, and captures a preimplementation baseline when
-possible. A current application can provide a real baseline. A greenfield stub can demonstrate
-missing capability while still passing constraints such as making no unauthorized changes. An
-import crash is an execution problem, not a meaningful failing baseline.
-
-`edd review CHANGE` prints deterministic Markdown with two explicit sections. The domain section
-contains requirements, scenario inputs, expected behavior, alternatives, and unacceptable outcomes.
-The technical section contains grader configuration, known controls, provenance, and the evidence
-each control supplies. Write and commit it with `edd review CHANGE --write`.
-
-Record `approve`, `request_changes`, or `needs_discussion` with `--area domain|technical`, the
-packet's `--criteria-digest`, reviewer name, rationale, and an optional stable `--subject`. Domain
-feedback can reference `requirement:ID` or `case:ID`; technical feedback can reference
-`requirement:ID` or `control:ID`. The repository-visible `review.json` retains events by criteria
-digest. Feedback never changes criteria or control labels. Edit canonical files explicitly,
-regenerate the packet, and review its semantic revision diff.
-
-Run `edd audit CHANGE` after domain approval. Technical approval requires that current audit to
-pass. Both human decisions, the audit, and a current committed packet are required for readiness.
-A passing audit proves only that the grader handled its declared controls; it is not universal
-grader validation.
-
-The current review, pipeline readiness, and evaluation results are separate facts. Use:
+## 3. Measure the starting behavior
 
 ```bash
-edd status cancellation
-edd status cancellation --verbose
-edd inspect cancellation --json
+edd measure CHANGE --target current --stage baseline --profile dev
 ```
 
-Once preparation is ready, the build skill reads those artifacts, derives an implementation plan, and runs the development profile as it changes the application. It uses ordinary software tests for the surrounding implementation as well as the LLM feature evaluations.
+Use a configured stub if the application does not exist yet and label it honestly. Save the
+returned run ID. A behavior `FAIL` is a useful baseline when execution completed. Import failures,
+malformed target output, and missing grader evidence are execution problems.
 
-## Run and verify directly
+`edd status CHANGE` shows the default measurement workflow and next action. Use
+`edd status CHANGE --acceptance` only for the strict gate.
 
-Choose target names from the generated configuration or `edd inspect` output:
+## 4. Build in small loops
+
+Use the build skill or work directly:
+
+```text
+$edd-build CHANGE
+```
+
+For each slice:
+
+1. Choose one behavior or failure class.
+2. Implement the smallest useful change.
+3. Run ordinary software tests.
+4. Measure the candidate.
+5. Inspect cases, gaps, and the comparison.
 
 ```bash
-edd audit cancellation
-edd run cancellation --target current --stage baseline --profile acceptance
-edd run cancellation --target candidate --stage candidate --profile dev
-edd run cancellation --target candidate --stage candidate --profile acceptance
-edd verify cancellation
+edd measure CHANGE --target candidate --stage candidate --profile dev \
+  --compare-to BASELINE_RUN_ID
 ```
 
-`current` and `candidate` above are illustrative configured target names. The check skill runs the control audit and fresh acceptance evaluation before verification; `edd verify` assesses recorded evidence rather than silently performing more model calls.
-For `run` or `check`, `--target` may be omitted when exactly one target is eligible. Ambiguous
-configurations stop before execution and print every valid explicit form.
+The report separates execution status from behavior decision. It includes target identity,
+observations, provenance, deferred cases, costs, and limitations.
 
-Reports keep three conclusions separate: whether the control audit passed, whether the candidate met acceptance policy, and whether it improved over a comparable baseline. A candidate can improve while still failing acceptance. A deliberately weak baseline does not fail a satisfactory candidate.
+## 5. Evolve the scenario set
 
-A development-profile baseline can guide implementation, but direct acceptance comparison needs matching acceptance-profile baseline evidence. When a comparable baseline is unavailable, the report states that limitation while assessing candidate acceptance separately.
+When a result reveals a distinct failure class, the agent adds a small focused group of cases,
+usually no more than five. Each addition records its source and why the expectation is believed.
 
-Provider-backed metrics require their configured credentials and execution budget. Missing access, exhausted budgets, and incomplete evidence remain visible in the result. A successful offline demonstration does not certify a live application.
+Changing a case, metric, fixture, dependency, profile, or policy changes the measurement instrument.
+EDD preserves older evidence and shows added, removed, and changed case IDs. It withholds numeric
+deltas across different bundles. If a direct comparison matters, rerun both application versions
+against the current bundle.
 
-## Revise and resume
+Do not lower thresholds or rewrite expectations merely to obtain a green result. Change them when
+the product intent changed or evidence shows that the measurement was wrong.
 
-Changes are files in the repository. Edit them yourself or ask the preparation skill to revise the same change. Refining an implementation approach can stay in the same change; a fundamentally different objective merits a new change.
+## 6. Check and hand off
 
-When acceptance criteria change, review the reason and affected labels, rerun the controls, and refresh the baseline evidence needed for a direct comparison. Previous green results belong to their recorded evaluation version. The CLI identifies stale evidence; changing the criteria does not retroactively validate an old run.
-
-To resume in another session, select the change and run its build or check skill. It reads current files, status, and evidence. Keep durable notes for decisions that would otherwise exist only in chat.
-
-## Team review and CI
-
-The same pull request can contain acceptance criteria, evaluation code, and implementation. Review the contract and label sources first, then the implementation and acceptance evidence. CI runs the configured pipeline and publishes its actual result.
-
-The portable `review.json` records domain and technical events against criteria digests and retains
-the snapshots needed for a semantic revision diff. Commit it with the generated `REVIEW.md` and
-canonical criteria. Schema-v1 combined stamps remain visible as legacy but no longer satisfy the
-two gates. `.edd/` retains local run and review history.
-
-This workflow supports cooperative contributors. Local review records and hashes identify decisions and detect ordinary drift; they do not authenticate evidence against someone who can rewrite the evaluator. A passing check is acceptance under the declared policy, not permission to merge, publish, or deploy.
-
-### Reusable GitHub Actions example
-
-Copy the packaged `assets/ci/edd.yml` resource to `.github/workflows/edd.yml` in the adopting repository. In this source checkout it is available at [the workflow template](../src/edd_kit/assets/ci/edd.yml). Initialization does not install CI configuration automatically.
-
-The template expects a committed `pyproject.toml` and `uv.lock` with the chosen EDD distribution and its DeepEval extra in an `eval` dependency group. Pin the distribution you have reviewed, whether installed from a release wheel or a versioned package source. Configure any application dependencies in the same locked environment.
-
-Call the reusable workflow from a project workflow with the relevant change and target:
-
-```yaml
-name: Feature acceptance
-on: [pull_request]
-permissions:
-  contents: read
-jobs:
-  cancellation:
-    uses: ./.github/workflows/edd.yml
-    with:
-      change: cancellation
-      target: candidate
-      upload-report: true # opt in only after checking the report's data sensitivity
+```text
+$edd-check CHANGE
 ```
 
-The template runs fresh grader controls, candidate acceptance, and verification, then writes one
-Markdown/JSON report with review state, blockers, expected versus observed behavior, controls,
-configuration, criteria and application revisions, and fresh-versus-saved provenance. It needs no
-baseline to assess standalone candidate acceptance. Actual reviewer approval remains part of your
-repository's PR policy.
+Or compare saved runs directly:
 
-The default example has no model-provider secrets and is suitable for deterministic metrics and
-local targets. Configure provider access only through your reviewed CI credential policy; an
-unavailable provider remains a failed or incomplete check. Both uploads are off by default because
-reports and raw evidence may contain case data. Enable `upload-report` for the consolidated bundle;
-enable `upload-evidence` separately only when raw `.edd` records are appropriate.
+```bash
+edd compare CHANGE --before RUN_ID --after RUN_ID
+```
+
+Hand back:
+
+- execution status and behavior decision;
+- important case-level failures;
+- deferred cases and missing evidence;
+- a numeric delta only when comparable;
+- ordinary test results;
+- links to Markdown and JSON reports.
+
+After three loops without useful movement, stop and identify whether the blocker is application
+behavior, evaluation quality, missing evidence, or a product decision.
+
+## Optional strict acceptance
+
+Use strict acceptance for release gates, high-risk workflows, compliance evidence, or explicit
+review requirements. It adds reviewed good and bad grader controls, domain and technical decisions,
+acceptance-profile execution, and verification:
+
+```bash
+edd status CHANGE --acceptance
+edd audit CHANGE
+edd review CHANGE --write
+edd run CHANGE --target current --stage baseline --profile acceptance
+edd check CHANGE --target candidate --report-dir .edd/CHANGE/acceptance
+```
+
+The reusable GitHub Actions template at
+[`src/edd_kit/assets/ci/edd.yml`](../src/edd_kit/assets/ci/edd.yml) runs this strict branch. Reports
+and raw evidence may contain sensitive data, so its artifact uploads remain opt-in.
+
+## Resume and revise
+
+Changes and run history live in the repository and `.edd/`. A later agent session reads the same
+brief, bundle, status, and reports. Refine the same change while its user objective remains stable;
+use a new change for a materially different objective.
+
+Local records and hashes expose ordinary drift. They do not authenticate reviewers or protect
+against someone who can rewrite evaluation code and history. See [Security](../SECURITY.md).

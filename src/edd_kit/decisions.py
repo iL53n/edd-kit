@@ -12,6 +12,7 @@ def decide(
     *,
     audit: bool = False,
     gaps: list[str] | None = None,
+    allow_empty: bool = False,
 ) -> dict:
     integrity_errors = []
     if not isinstance(gaps, (list, type(None))) or any(
@@ -24,7 +25,7 @@ def decide(
         integrity_errors.append("Expected observation identities must be a list")
         expected = []
     expected_ids = {identity for identity in expected if isinstance(identity, str) and identity}
-    if not expected or len(expected) != len(expected_ids):
+    if (not expected and not allow_empty) or len(expected) != len(expected_ids):
         integrity_errors.append("Expected observation identities must be nonempty and unique")
     if not isinstance(observations, list):
         integrity_errors.append("Observations must be a list")

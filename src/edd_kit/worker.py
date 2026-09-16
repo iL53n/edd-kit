@@ -177,6 +177,17 @@ def _load(project: Project) -> tuple[Suite, dict]:
         ):
             raise ProjectError("Case requirements must be unique declared requirement IDs")
         if (
+            not isinstance(case.source, str)
+            or not case.source.strip()
+            or not isinstance(case.expectation_source, str)
+            or not case.expectation_source.strip()
+            or (
+                case.deferred_reason is not None
+                and (not isinstance(case.deferred_reason, str) or not case.deferred_reason.strip())
+            )
+        ):
+            raise ProjectError("Case provenance and deferred reason must be nonempty text")
+        if (
             not isinstance(case.profiles, tuple)
             or not case.profiles
             or len(set(case.profiles)) != len(case.profiles)
@@ -266,7 +277,10 @@ def _plan(
                 f"{requirement.id}: missing independently authored negative validation control"
             )
         coverage = sum(
-            profile in case.profiles and requirement.id in case.requirements for case in suite.cases
+            profile in case.profiles
+            and case.deferred_reason is None
+            and requirement.id in case.requirements
+            for case in suite.cases
         )
         if coverage < requirement.min_cases:
             application_gaps.append(
@@ -286,6 +300,9 @@ def _plan(
             "expected_behavior": case.expected_behavior,
             "acceptable_alternatives": list(case.acceptable_alternatives),
             "unacceptable_behaviors": list(case.unacceptable_behaviors),
+            "source": case.source,
+            "expectation_source": case.expectation_source,
+            "deferred_reason": case.deferred_reason,
         }
         for case in suite.cases
     ]
@@ -314,7 +331,7 @@ def _plan(
     rows = []
     if operation == "run":
         for case in suite.cases:
-            if profile not in case.profiles:
+            if profile not in case.profiles or case.deferred_reason is not None:
                 continue
             for trial in range(1, config.trials + 1):
                 for req in case.requirements:

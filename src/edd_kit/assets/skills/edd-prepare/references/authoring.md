@@ -17,8 +17,10 @@ is configured independently through the target command.
 
 The short brief records intent, exclusions, consequential decisions, representative acceptable and
 unacceptable examples, and remaining risks. Reuse existing Spec Kit/OpenSpec/project specifications
-by reference. Include external specifications and evaluator helpers in `artifacts` so edits make
-earlier evidence stale. Preserve existing application architecture in brownfield projects.
+by reference. Treat the brief as a living hypothesis, not a promise that all design questions are
+settled before implementation. Include external specifications and evaluator helpers in `artifacts`
+so edits make earlier evidence stale. Preserve existing application architecture in brownfield
+projects.
 
 ## Contract
 
@@ -88,6 +90,9 @@ def build_suite():
                 expected_behavior="Return null rather than guessing a total.",
                 acceptable_alternatives=("Equivalent valid JSON whitespace is acceptable.",),
                 unacceptable_behaviors=("Copy a subtotal or invent a value.",),
+                source="anonymized production trace",
+                expectation_source="reviewed invoice-processing policy",
+                deferred_reason=None,
             ),
             # Add the other independently sourced domain scenarios required by coverage policy.
         ],
@@ -114,8 +119,9 @@ def build_suite():
     )
 ```
 
-The shortened example is intentionally incomplete: author the domain metric and additional cases
-and controls before expecting the audit to pass. Load datasets using paths relative to `__file__`.
+The shortened example is intentionally incomplete. Author the domain metric and representative
+cases before measuring; add controls before expecting the strict audit to pass. Load datasets using
+paths relative to `__file__`.
 Every identity is stable and unique. Every case maps to requirements, includes specialist-readable
 behavior, and every requirement has a native metric factory. Controls exercise their mapped metric,
 carry explicit provenance and rationale, and include an independently authored negative example;
@@ -132,6 +138,12 @@ Controls with `partition="calibration"` are tuning material, not validation evid
 controls need both expected labels for each requirement, meaningful source provenance, and actual
 review. When a validation example influences tuning, reclassify it and obtain new validation
 examples. Local partitions are visible to the coding agent; they are not protected holdouts.
+
+Cases may use `source` to identify where the input came from and `expectation_source` to identify
+why the expected behavior is believed. Typical values are production trace, manually authored,
+reviewed policy, and synthetic. If an expectation is unresolved, set `deferred_reason`; EDD keeps
+the case visible but does not execute or grade it. Resolve deferred cases in small batches as
+evidence becomes available.
 
 ## Target process interface
 
@@ -165,6 +177,10 @@ Run `edd inspect CHANGE --json` before execution to inspect case/control mapping
 Execution refuses plans beyond `max_observations`. Each target trial is fresh; grader repetitions
 do not turn one scenario into multiple independent scenarios. EDD does not retry failed observations
 into success or count cached responses as fresh independent trials.
+
+Use `edd measure` for the ordinary development loop. It records a run and writes a human Markdown
+report plus machine-readable JSON. Use controls, review records, `edd audit`, `edd verify`, and
+`edd check` when the task requires strict acceptance.
 
 Native model graders require explicit provider configuration in their factory, named environment
 references in `evaluator_env`, a positive cost policy, and the command's `--allow-paid` opt-in.

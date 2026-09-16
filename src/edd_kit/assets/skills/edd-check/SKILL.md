@@ -1,49 +1,41 @@
 ---
 name: edd-check
-description: Run fresh acceptance evaluations for a prepared EDD change and explain its control audit, candidate decision, baseline comparison, and evidence gaps.
+description: Measure an LLM feature, compare compatible runs, and explain behavior failures separately from execution problems.
 ---
 
-# Check the current candidate
+# Check the current behavior
 
-Produce fresh acceptance evidence for the selected change. A check request authorizes evaluation and local reports; it does not by itself request implementation changes or publication.
+Produce inspectable evidence for the selected change. Use the installed CLI's `--help` for exact syntax.
 
-## 1. Inspect the current inputs
+## 1. Inspect the bundle
 
-Read the selected change's contract and run `edd status CHANGE --json` and
-`edd inspect CHANGE --json`. Resolve an ambiguous change name before execution. Use the shared
-workflow state and diagnostics to identify the candidate target, acceptance profile, required
-evidence, current review, baseline provenance, and first blocking action.
+Read the brief, contract, cases, relevant target code, and `edd status CHANGE`. Use [the authoring reference](../edd-prepare/references/authoring.md) when interpreting metrics, adapters, fixtures, or provenance.
 
-Read [the authoring reference](../edd-prepare/references/authoring.md) when interpreting adapters, fixture evidence, native metrics, or comparison rules. Use the installed CLI's `--help` for the supported command options.
+Confirm the intended target and profile. Note deferred cases and unresolved assumptions before running the measurement.
 
-A changed contract, grader, control, fixture, or policy can invalidate prior evidence. Retain stale results as history; use the current evaluation version for this decision. If review is missing, explain that acceptance remains unavailable even if diagnostic evaluation can run. Only record a review when the user has explicitly made that decision for the current contents.
+## 2. Measure and compare
 
-## 2. Execute and verify
-
-Run the configured controls, a fresh candidate evaluation, verification, and one consolidated
-report:
+Run a fresh candidate measurement:
 
 ```bash
-edd check CHANGE --target TARGET --report-dir .edd/CHANGE/report --revision REVISION
+edd measure CHANGE --target TARGET --stage candidate --profile dev --compare-to BASELINE_RUN_ID
 ```
 
-Use the configured budgets and provider settings. If execution is blocked, retain its actual error or incomplete outcome and complete the independent checks that remain possible. Treat cached or replayed results according to their recorded identity; they are not fresh independent application trials.
+Omit `--compare-to` when no relevant baseline exists. You can compare saved runs separately with:
 
-Inspect `report.md` and the individual recorded evidence, not only a native DeepEval summary or a
-command's green output. The report labels runs created by this check as fresh and prior records as
-saved. The deterministic verifier is the authority for the declared gate. A known bad control
-rejected by its intended grader is a successful audit observation, even though that underlying
-application-level observation fails.
+```bash
+edd compare CHANGE --before RUN_ID --after RUN_ID
+```
 
-## 3. Explain the decision
+Inspect `report.md`, not only the terminal summary. Report two decisions separately:
 
-Report these separately:
+- **Execution status:** whether the measurement completed, is inconclusive, or hit an execution error.
+- **Behavior decision:** what the configured requirements and metrics observed, including `PASS`, `FAIL`, or `INCOMPLETE`.
 
-- **Control audit:** whether the current graders distinguish the reviewed good and bad outcomes, including false passes and false failures.
-- **Candidate acceptance:** the verifier's decision for the actual candidate and acceptance profile, with critical violations and incomplete execution visible.
-- **Baseline comparison:** changes under comparable criteria, or the explicit reason no comparison is supported. Baseline failure does not itself fail the candidate; improvement does not itself establish acceptance.
-- **Scope and evidence:** target identity, replay/stub/live distinction, authoritative state collection where required, scenario/trial counts, and links to reports.
+Treat a behavior failure as a valid measurement result. Do not claim a numeric improvement when EDD marks the comparison unavailable. Explain added, removed, and changed cases and suggest rerunning both application versions with the current bundle.
 
-For every non-passing outcome, identify the unmet requirement or execution problem and its next action. Request necessary domain clarification without silently editing the criteria to match observed output.
+## 3. Hand back useful evidence
 
-Completion: fresh execution and verification have produced inspectable evidence, or the exact blocked/incomplete state has been recorded. For a check-only request, hand back the findings. If the user already asked to fix and finish the feature, return to [edd-build](../edd-build/SKILL.md) for the affected implementation work. Acceptance does not authorize merge, deployment, or publication.
+Summarize the target identity, scenario and observation counts, important failures, deferred cases, comparison status, cost, and remaining evidence gaps. Link the generated Markdown and JSON reports.
+
+If the user asked to fix the behavior, return to [edd-build](../edd-build/SKILL.md) and repeat the loop. When the user explicitly requires a release gate, reviewer sign-off, or compliance evidence, follow [the strict acceptance workflow](../edd-prepare/references/acceptance.md).

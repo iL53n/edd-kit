@@ -30,7 +30,7 @@ def test_cli_initializes_and_prepares_without_claiming_domain_evaluation_is_read
     output = json.loads(prepared.stdout)
     assert output["authoring_required"] is True
     assert output["change"] == "answering"
-    status = command(tmp_path, "status", "answering", "--json")
+    status = command(tmp_path, "status", "answering", "--acceptance", "--json")
     assert status.returncode == 0
     assert json.loads(status.stdout)["ready_to_build"] is False
 
@@ -84,14 +84,14 @@ def test_status_presents_workflow_phase_and_additive_machine_actions(tmp_path):
         command(tmp_path, "prepare", "feature", "--brief", "A reviewable behavior").returncode == 0
     )
 
-    human = command(tmp_path, "status", "feature")
+    human = command(tmp_path, "status", "feature", "--acceptance")
     assert human.returncode == 0
     assert "EDD feature — PREPARE" in human.stdout
     assert "Next (cli)" in human.stdout
     assert "edd review feature --write" in human.stdout
     assert "EDD feature: INCONCLUSIVE" not in human.stdout
 
-    machine = command(tmp_path, "status", "feature", "--json")
+    machine = command(tmp_path, "status", "feature", "--acceptance", "--json")
     payload = json.loads(machine.stdout)
     assert payload["decision"] == "INCONCLUSIVE"
     assert payload["workflow"]["phase"] == "prepare"
@@ -99,8 +99,8 @@ def test_status_presents_workflow_phase_and_additive_machine_actions(tmp_path):
     assert payload["diagnostics"][0]["code"] == "review-packet-missing"
 
     dashboard = command(tmp_path, "status")
-    assert "PREPARE" in dashboard.stdout
-    assert "Next: edd review feature --write" in dashboard.stdout
+    assert "MEASURE" in dashboard.stdout
+    assert "Next: edd measure feature --target TARGET" in dashboard.stdout
 
 
 def test_review_packet_is_read_only_and_records_two_explicit_review_areas(tmp_path):
@@ -161,7 +161,7 @@ def test_review_packet_is_read_only_and_records_two_explicit_review_areas(tmp_pa
     )
     assert technical.returncode == 0, technical.stdout
     assert control_path.read_bytes() == before
-    status = json.loads(command(tmp_path, "status", "feature", "--json").stdout)
+    status = json.loads(command(tmp_path, "status", "feature", "--acceptance", "--json").stdout)
     assert status["review"]["status"] == "current"
 
 

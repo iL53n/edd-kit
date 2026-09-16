@@ -10,6 +10,184 @@ from .evidence import timestamp
 from .project import Project, ProjectError, safe_path
 
 
+def build_measurement_report(
+    project: Project,
+    *,
+    run: dict,
+    comparison: dict | None,
+    application_revision: str | None,
+) -> dict:
+    observations: dict[str, list[dict]] = {}
+    for row in run.get("observations", []):
+        observations.setdefault(row["case_id"], []).append(
+            {
+                key: row.get(key)
+                for key in (
+                    "id",
+                    "requirement_id",
+                    "trial",
+                    "repetition",
+                    "passed",
+                    "score",
+                    "reason",
+                    "error",
+                    "actual_output",
+                )
+            }
+        )
+    cases = [
+        {
+            "id": case["case_id"],
+            "requirements": case.get("requirements", []),
+            "input": case.get("input"),
+            "description": case.get("description"),
+            "expected_behavior": case.get("expected_behavior"),
+            "reference_output": case.get("reference_output"),
+            "acceptable_alternatives": case.get("acceptable_alternatives", []),
+            "unacceptable_behaviors": case.get("unacceptable_behaviors", []),
+            "source": case.get("source", "unknown"),
+            "expectation_source": case.get("expectation_source", "unknown"),
+            "deferred_reason": case.get("deferred_reason"),
+            "observations": observations.get(case["case_id"], []),
+        }
+        for case in run.get("cases", [])
+    ]
+    if run.get("execution_errors") or run.get("integrity_errors") or run.get("errors"):
+        execution_status = "ERROR"
+    elif run.get("missing") or run.get("gaps"):
+        execution_status = "INCONCLUSIVE"
+    else:
+        execution_status = "COMPLETE"
+    target_config = run.get("target_identity", {}).get("config", {})
+    saved_contract = run.get("bundle_identity", {}).get("criteria", {}).get("contract", {})
+    report = {
+        "schema_version": 1,
+        "kind": "measurement-report",
+        "created_at": timestamp(),
+        "change": project.change,
+        "title": saved_contract.get("title", project.contract.title),
+        "execution_status": execution_status,
+        "behavior_decision": run.get("decision"),
+        "run_id": run["id"],
+        "run_kind": run["kind"],
+        "profile": run["profile"],
+        "criteria_digest": run["criteria_digest"],
+        "bundle_digest": run["bundle_digest"],
+        "target": run.get("target"),
+        "target_digest": run.get("target_digest"),
+        "application_revision": application_revision
+        or target_config.get("version")
+        or run.get("target_digest"),
+        "counts": run.get("counts", {}),
+        "expected": run.get("expected", 0),
+        "completed": run.get("completed", 0),
+        "scenario_count": len(cases),
+        "deferred_count": sum(bool(case["deferred_reason"]) for case in cases),
+        "requirements": run.get("requirements", {}),
+        "observed_cost_usd": run.get("observed_cost_usd"),
+        "gaps": run.get("gaps", []),
+        "execution_errors": run.get("execution_errors", []),
+        "cases": cases,
+        "comparison": comparison,
+        "limitation": (
+            "This is a measurement over the recorded scenarios, not product acceptance or an "
+            "estimate of production reliability."
+        ),
+    }
+    report["markdown"] = render_measurement_report(report)
+    return report
+
+
+def render_measurement_report(report: dict) -> str:
+    def cell(value: object) -> str:
+        shown = "unknown" if value is None or value == "" else value
+        return str(shown).replace("|", "\\|").replace("\n", " ")
+
+    lines = [
+        f"# EDD measurement: {report['title']}",
+        "",
+        f"Execution: **{report['execution_status']}**  ",
+        f"Observed behavior: **{report['behavior_decision']}**  ",
+        f"Run: `{report['run_id']}`  ",
+        f"Target: `{report['target']}`  ",
+        f"Scenarios: {report['scenario_count']} ({report['deferred_count']} deferred)  ",
+        f"Observations: {report['completed']}/{report['expected']}",
+        "",
+        "## Scenario inventory",
+        "",
+        "| Scenario | Source | Expectation source | Result |",
+        "| --- | --- | --- | --- |",
+    ]
+    for case in report["cases"]:
+        if case["deferred_reason"]:
+            result = "deferred"
+        elif any(row.get("error") for row in case["observations"]):
+            result = "error"
+        elif any(row.get("passed") is False for row in case["observations"]):
+            result = "fail"
+        elif case["observations"] and all(
+            row.get("passed") is True for row in case["observations"]
+        ):
+            result = "pass"
+        else:
+            result = "incomplete"
+        lines.append(
+            f"| `{cell(case['id'])}` | {cell(case['source'])} | "
+            f"{cell(case['expectation_source'])} | {result} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Problems and changes",
+            "",
+        ]
+    )
+    problems = []
+    for case in report["cases"]:
+        failed = [
+            row for row in case["observations"] if row.get("error") or row.get("passed") is False
+        ]
+        if failed or case["deferred_reason"]:
+            problems.append((case, failed))
+    if not problems:
+        lines.append("No failed or deferred scenarios in this run.")
+    for case, failures in problems:
+        lines.extend(
+            [
+                "",
+                f"### `{case['id']}`",
+                "",
+                case["expected_behavior"] or "_No expected behavior recorded._",
+            ]
+        )
+        if case["deferred_reason"]:
+            lines.append(f"- Deferred: {case['deferred_reason']}")
+        for row in failures:
+            outcome = row.get("error") or row.get("reason") or "check failed"
+            lines.append(f"- `{row['requirement_id']}`: {outcome}")
+            if row.get("actual_output") is not None:
+                lines.append(f"  Observed: `{row['actual_output']}`")
+    comparison = report.get("comparison")
+    if comparison:
+        lines.extend(["", "## Comparison", ""])
+        if comparison["status"] == "comparable":
+            for requirement, delta in comparison.get("deltas", {}).items():
+                lines.append(f"- `{requirement}`: {delta:+.3f}")
+            if not comparison.get("changed_observations"):
+                lines.append("- No observation result changed.")
+        else:
+            lines.append(f"- Unavailable: {comparison['reason']}")
+        changes = comparison.get("case_changes", {})
+        for name in ("added", "removed", "changed"):
+            if changes.get(name):
+                lines.append(f"- Cases {name}: {', '.join(changes[name])}")
+    if report["gaps"] or report["execution_errors"]:
+        lines.extend(["", "## Incomplete evidence", ""])
+        lines.extend(f"- {value}" for value in [*report["gaps"], *report["execution_errors"]])
+    lines.extend(["", f"> {report['limitation']}", ""])
+    return "\n".join(lines)
+
+
 def _evidence_summary(run: dict | None, status: dict, fresh: set[str]) -> dict:
     if run is None:
         return {"status": "missing", "origin": "saved"}

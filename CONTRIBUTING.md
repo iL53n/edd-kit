@@ -1,6 +1,8 @@
 # Contributing to EDD Kit
 
-EDD generates executable acceptance criteria before feature implementation. Preserve that workflow for both new and existing applications; the cancellation example is one demonstration, not the only supported domain.
+EDD adds executable behavior measurement to coding-agent development. Preserve the lightweight
+measure-and-improve loop and the optional strict acceptance branch for new and existing
+applications. The cancellation example is one demonstration, not the only supported domain.
 
 ## Development environment
 
@@ -27,7 +29,9 @@ Keep changes focused on observable behavior. For a feature or bug fix, add a fai
 
 Exercise both legitimate behavior and relevant defects. A test that only checks that a Markdown heading exists does not demonstrate that an agent skill generates a working pipeline. For skill changes, use a bounded example in a temporary project and inspect the generated artifacts and evaluation results. Include a non-cancellation feature when the change affects general generation behavior.
 
-Preserve user-authored files and existing manual changes. Contract revisions should explain their effect on acceptance, controls, review, and comparable baseline evidence. Keep actual acceptance decisions separate from baseline improvement and execution health.
+Preserve user-authored files and existing manual changes. Bundle revisions should expose changed
+scenarios and explain their effect on comparability. Keep execution health, behavior decisions,
+baseline improvement, and strict acceptance separate.
 
 ## Pull requests
 

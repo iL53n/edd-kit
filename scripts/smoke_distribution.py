@@ -44,9 +44,24 @@ def smoke(python: str) -> None:
         assert demo["demonstrated"] and demo["checks"]["wrong_owner_change"] == "DETECTED"
         invoke("init", "--agent", "codex")
         assert (root / ".agents/skills/edd-prepare/references/authoring.md").is_file()
+        assert (root / ".agents/skills/edd-prepare/references/acceptance.md").is_file()
         invoke("prepare", "orders", "--template", "cancellation", "--brief", "Synthetic wheel test")
         assert (root / "evals/orders/eval-requirements.lock").is_file()
         assert invoke("inspect", "orders")["execution_errors"] == []
+        measured_baseline = invoke("measure", "orders", "--target", "stub", "--stage", "baseline")
+        assert measured_baseline["execution_status"] == "COMPLETE"
+        assert measured_baseline["behavior_decision"] == "FAIL"
+        assert (root / measured_baseline["report_paths"]["markdown"]).is_file()
+        measured_candidate = invoke(
+            "measure",
+            "orders",
+            "--target",
+            "candidate",
+            "--compare-to",
+            measured_baseline["run_id"],
+        )
+        assert measured_candidate["comparison"]["status"] == "comparable"
+        assert invoke("status", "orders")["mode"] == "measurement"
         packet = invoke("review", "orders")
         assert packet["kind"] == "review-packet" and packet["controls"][0]["evidence"]
         written = invoke("review", "orders", "--write")
@@ -83,7 +98,7 @@ def smoke(python: str) -> None:
         )
         baseline = invoke("run", "orders", "--target", "stub", "--stage", "baseline", expected=1)
         assert baseline["target_kind"] == "stub" and baseline["errors"] == 0
-        status = invoke("status", "orders")
+        status = invoke("status", "orders", "--acceptance")
         assert status["ready_to_build"] and status["workflow"]["phase"] == "build"
         assert invoke("check", "orders", "--target", "candidate")["decision"] == "PASS"
         invoke("run", "orders", "--target", "wrong-owner", expected=1)
@@ -101,7 +116,7 @@ def smoke(python: str) -> None:
         assert draft["authoring_required"]
         draft_audit = invoke("audit", "draft")
         assert draft_audit["decision"] == "PASS"
-        draft_status = invoke("status", "draft")
+        draft_status = invoke("status", "draft", "--acceptance")
         assert not draft_status["ready_to_build"] and not draft_status["accepted"]
         inferred = invoke("run", "draft", expected=1)
         assert inferred["target"] == "candidate"
@@ -112,6 +127,7 @@ def smoke(python: str) -> None:
                     "result": "PASS",
                     "checks": [
                         "packaged skills and lock",
+                        "development measurement and comparison",
                         "isolated guided demo",
                         "review packet and workflow status",
                         "separate domain and technical review gates",

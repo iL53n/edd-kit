@@ -62,6 +62,9 @@ def build_suite():
                 expected_behavior=row["expected_behavior"],
                 acceptable_alternatives=tuple(row["acceptable_alternatives"]),
                 unacceptable_behaviors=tuple(row["unacceptable_behaviors"]),
+                source=row.get("source", "unknown"),
+                expectation_source=row.get("expectation_source", "unknown"),
+                deferred_reason=row.get("deferred_reason"),
             )
             for row in rows
         ],

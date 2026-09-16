@@ -118,7 +118,7 @@ def smoke(python: str, source: Path) -> None:
             assert baseline["completed"] == observations and baseline["errors"] == 0
             assert sum(row["passed"] is False for row in baseline["observations"]) == failed
             assert baseline["target_kind"] == ("stub" if project == root else "application")
-            assert invoke(project, "status", change)["ready_to_build"] is True
+            assert invoke(project, "status", change, "--acceptance")["ready_to_build"] is True
 
         check_script(root, "-m", "unittest", "discover", "-s", "tests", "-v")
         candidate = root / "targets/invoice-extraction/candidate.py"
@@ -128,8 +128,8 @@ def smoke(python: str, source: Path) -> None:
         assert result["comparison"]["status"] == "comparable"
         assert result["comparison"]["baseline_kind"] == "stub"
         assert hashlib.sha256(candidate.read_bytes()).hexdigest() == before
-        assert invoke(root, "status", "invoice-extraction")["accepted"] is True
-        assert not invoke(root / "brownfield", "status", "inline-total")["accepted"]
+        assert invoke(root, "status", "invoice-extraction", "--acceptance")["accepted"] is True
+        assert not invoke(root / "brownfield", "status", "inline-total", "--acceptance")["accepted"]
         assert (root / "brownfield/app/target.py").read_bytes() == candidate.read_bytes()
         for project, change in (
             (root, "invoice-extraction"),

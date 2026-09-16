@@ -10,38 +10,40 @@ The [implementation contract](implementation.md) defines the scope; the
 | Requirement | Inspected implementation and actual evidence |
 | --- | --- |
 | 1. Package, CLI, reproducible DeepEval environment | Wheel and source distribution built with locked build dependencies; `twine check --strict` passed. Exact exported evaluator lock matches `uv.lock`. Hashed dependencies installed in isolated macOS environments and disposable Linux containers. Installed-wheel smoke exercised real CLI operations, resources and native grading. |
-| 2. Initialization, authoring, brownfield, review, resume, safe sync | Scaffold tests exercised idempotence, existing-file preservation, custom change directories, path rejection and customization-preserving skill updates. Focused lifecycle tests cover deterministic specialist-readable Markdown, stable IDs, semantic before/after diffs, separate digest-guarded domain and technical decisions, reopened questions, legacy-review migration, atomic rollback, target inference and typo recovery. Independent Prepare/Build examples remain in the [retained example](../examples/invoice-extraction/README.md). |
-| 3. Native suite and execution policy | Contract, backend and execution tests exercised real `Case`/`Control`/`Suite` and DeepEval metrics, positive/negative controls, calibration exclusion, scenario coverage, trials, fresh factories, fixed configurations and strict policy types. Native G-Eval scored through a fake provider transport; this verifies native integration, not live model quality. |
-| 4. Audit, target execution, baseline, acceptance, identities, reports | Full workflows executed known-good, no-op and wrong-owner targets, a failing stub baseline, fresh acceptance, verification and consolidated Markdown/JSON reporting. Reports distinguish newly executed checks from saved evidence and include blockers, expected/observed behavior, controls, review digests, application revision and grader configuration. Evidence tests inspected durable observations, target/runtime/environment identities, source digests, stale criteria/targets and comparison eligibility. Explicit unavailable baseline creates no invented observations or score. |
+| 2. Initialization, skill-first authoring, brownfield, resume, safe sync | Scaffold tests exercised idempotence, existing-file preservation, custom change directories, path rejection and customization-preserving skill updates. The packaged Prepare/Build/Check skills now lead with the lightweight measurement loop and disclose strict acceptance as a separate branch. Independent examples remain in the [retained example](../examples/invoice-extraction/README.md). |
+| 3. Native suite and execution policy | Contract, backend and execution tests exercised real `Case`/`Control`/`Suite` and DeepEval metrics, case and expectation provenance, deferred scenarios, empty control sets for development measurement, scenario coverage, trials, fresh factories, fixed configurations and strict policy types. Native G-Eval scored through a fake provider transport; this verifies native integration, not live model quality. |
+| 4. Measurement, comparison, acceptance, identities, reports | Full workflows executed known-good, no-op and wrong-owner targets, failing and passing development measurements, compatible comparison, bundle-change refusal with case diffs, default Markdown/JSON reports, and the retained strict audit/acceptance flow. Evidence tests inspected durable observations, saved requirement semantics, target/runtime/environment identities, source digests and stale criteria/targets. |
 | 5. Process, environment and execution safety | Real child-process tests covered separate credential allowlists, no expected-answer forwarding, bounded stdout/stderr, timeouts, cancellation/descendant cleanup, missing credentials, disabled implicit dotenv/telemetry, cost opt-in and unknown-cost handling. Native diagnostic credential redaction preserves structural identities. These controls are not hostile-code isolation or a provider-enforced spending ceiling. |
 | 6. Fail-closed results | Decision and integrity tests exercised PASS/FAIL/ERROR/INCONCLUSIVE, critical failures, incomplete/duplicate/malformed observations, overflowed numbers, altered plans, forged summaries, checksum corruption, missing/stale review and stale target evidence. Verification recomputes the gate from evidence rather than trusting a saved green summary. |
-| 7. Demo, starter and independent feature | `edd demo cancellation` runs outside the current repository and catches false success and unauthorized changes without claiming approval. Native tests also catch an unauthorized change later reversed. Starter controls declare synthetic provenance but do not confer domain or technical approval. Independent invoice Prepare→Build→Check and existing-app Prepare artifacts retain provenance and limitations. |
-| 8. Workflow validation, fault tests, packaging, CI, trust/release docs | All three updated packaged skills passed the skill validator. The current macOS/Python 3.12 suite passed 207 tests; the final wheel passed strict metadata checks, the expanded installed-distribution workflow, and retained-example replay. The earlier 185-test release baseline passed the six-environment matrix below; the new lifecycle delta has not yet been rerun across that complete matrix. |
+| 7. Demo, starter and independent feature | `edd demo cancellation` runs outside the current repository and catches false success and unauthorized changes without claiming approval. Native tests also catch an unauthorized change later reversed. Starter cases declare synthetic provenance. Independent invoice and brownfield artifacts retain provenance and limitations. |
+| 8. Workflow validation, fault tests, packaging, CI, trust/release docs | The current macOS/Python 3.13 suite passed 215 tests. Ruff, mypy, wheel/sdist build, strict metadata checks, the installed-wheel workflow, and retained-example replay passed. The earlier 185-test release baseline passed the six-environment matrix below; this measurement-loop delta has not yet been rerun across that complete matrix. |
 
 ## Executed compatibility checks
 
-All environments used DeepEval 4.2.3 and the shipped hashed evaluator dependencies. The focused UX
-delta was verified on macOS ARM64 Python 3.12.11. The other rows record the pre-UX 185-test baseline,
-not a claim that the expanded suite ran there. Rerun the complete matrix before publication.
+All environments used DeepEval 4.2.3 and the shipped hashed evaluator dependencies. The current
+measurement-loop delta was verified on macOS ARM64 Python 3.13.5. The other rows record older
+baselines, not a claim that the expanded suite ran there. Rerun the complete matrix before
+publication.
 
 | Environment | Full test suite | Installed distribution workflow |
 | --- | --- | --- |
 | macOS / Python 3.11 | 185 passed (pre-UX baseline) | PASS (pre-UX baseline) |
-| macOS / Python 3.12 | **207 passed (current)** | **PASS (current)** |
-| macOS / Python 3.13 | 185 passed (pre-UX baseline) | PASS (pre-UX baseline) |
+| macOS / Python 3.12 | 207 passed (pre-measurement baseline) | PASS (pre-measurement baseline) |
+| macOS / Python 3.13 | **215 passed (current)** | **PASS (current)** |
 | Linux / Python 3.11 | 185 passed (pre-UX baseline) | PASS (pre-UX baseline) |
 | Linux / Python 3.12 | 185 passed (pre-UX baseline) | PASS (pre-UX baseline) |
 | Linux / Python 3.13 | 185 passed (pre-UX baseline) | PASS (pre-UX baseline) |
 
 The distribution smoke runs from an unrelated temporary project and verifies it imported the wheel,
 not the editable source. It exercises the isolated guided demo, initialization, packaged
-skills/lock, review packet, separate domain/technical decisions, workflow status, native audit,
+skills/lock, development measurement and comparison, review packet, separate domain/technical
+decisions, workflow status, native audit,
 genuine failing baseline, consolidated reporting, readiness, acceptance, deliberate defects,
 target inference, stale evidence and an unreviewed draft. See
 [the executable smoke](../scripts/smoke_distribution.py).
 
 Ruff lint/format checks passed for source, tests and verification scripts; mypy passed for all
-24 source files. Skill frontmatter/reference validation passed for Prepare, Build and Check.
+24 source files. Packaged-skill installation and reference copying passed in unit and wheel smoke.
 An OSV-backed `uv audit --locked` checked 103 locked packages and reported zero known vulnerabilities
 or adverse statuses on the date above. The experimental audit tool and vulnerability database
 provide point-in-time evidence, not a security guarantee.

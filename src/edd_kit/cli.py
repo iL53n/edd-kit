@@ -26,9 +26,7 @@ class Parser(argparse.ArgumentParser):
 
 
 def parser() -> argparse.ArgumentParser:
-    result = Parser(
-        description="EDD Kit: Prepare → Build → Check. Agents author; this CLI validates and runs."
-    )
+    result = Parser(description="EDD Kit: specify briefly, measure behavior, improve, and compare.")
     result.add_argument("--version", action="version", version=f"edd {__version__}")
     result.add_argument(
         "--root", type=Path, default=Path.cwd(), help="Project root (default: current directory)"
@@ -46,8 +44,10 @@ def parser() -> argparse.ArgumentParser:
         "review": "Record an explicitly authorized review of current criteria",
         "audit": "Evaluate graders against reviewed positive and negative controls",
         "run": "Run an application, stub, or reference target",
+        "measure": "Run a development measurement and optionally compare it",
+        "compare": "Compare two saved measurements without executing them",
         "verify": "Verify current review, audit, and candidate acceptance evidence",
-        "status": "Show durable readiness and acceptance state",
+        "status": "Show measurement state or optional strict acceptance readiness",
         "report": "Read a recorded run and its per-observation evidence",
         "check": "Run fresh audit and candidate acceptance, then verify",
         "demo": "Run the isolated offline cancellation walkthrough",
@@ -73,6 +73,12 @@ def parser() -> argparse.ArgumentParser:
             )
         if name == "baseline-unavailable":
             command.add_argument("--reason", required=True)
+        if name == "status":
+            command.add_argument(
+                "--acceptance",
+                action="store_true",
+                help="Show the optional strict acceptance workflow",
+            )
         if name == "review":
             command.add_argument(
                 "--write", action="store_true", help="Write the deterministic REVIEW.md packet"
@@ -102,18 +108,31 @@ def parser() -> argparse.ArgumentParser:
                 "--criteria-digest",
                 help="Reject approval if criteria changed after the review packet",
             )
-        if name in {"inspect", "audit", "run"}:
-            command.add_argument("--profile", choices=["dev", "acceptance"], default="acceptance")
-        if name in {"audit", "run", "check"}:
+        if name in {"inspect", "audit", "run", "measure"}:
+            command.add_argument(
+                "--profile",
+                choices=["dev", "acceptance"],
+                default="dev" if name == "measure" else "acceptance",
+            )
+        if name in {"audit", "run", "measure", "check"}:
             command.add_argument(
                 "--allow-paid",
                 action="store_true",
                 help="Allow configured model judges within the declared work/cost policy",
             )
-        if name in {"run", "check"}:
+        if name in {"run", "measure", "check"}:
             command.add_argument("--target")
-        if name == "run":
+        if name in {"run", "measure"}:
             command.add_argument("--stage", choices=["baseline", "candidate"], default="candidate")
+        if name == "measure":
+            command.add_argument("--compare-to", metavar="RUN_ID")
+            command.add_argument("--report-dir")
+            command.add_argument(
+                "--revision", help="Application source revision shown in the report"
+            )
+        if name == "compare":
+            command.add_argument("--before", required=True, metavar="RUN_ID")
+            command.add_argument("--after", required=True, metavar="RUN_ID")
         if name == "report":
             command.add_argument("--run", help="Recorded run ID (default: newest)")
             command.add_argument(
@@ -180,7 +199,7 @@ def dispatch(args) -> dict:
             "command": name,
             "authoring_required": args.template == "starter",
             "next_steps": [
-                "Review the brief; author domain cases, metrics, controls and the target adapter",
+                "Review the brief; author domain cases, metrics and the target adapter",
                 f"Terminal: edd inspect {args.change} --json",
             ],
         }
@@ -197,10 +216,23 @@ def dispatch(args) -> dict:
             if directory.exists()
             else []
         )
-        statuses = [Workflow(root, change).status() for change in changes]
+        statuses = [
+            Workflow(root, change).status()
+            if args.acceptance
+            else Workflow(root, change).measurement_status()
+            for change in changes
+        ]
+        phases = (
+            ("prepare", "build", "check", "complete")
+            if args.acceptance
+            else (
+                "prepare",
+                "measure",
+                "improve",
+            )
+        )
         summary = {
-            phase: sum(item["workflow"]["phase"] == phase for item in statuses)
-            for phase in ("prepare", "build", "check", "complete")
+            phase: sum(item["workflow"]["phase"] == phase for item in statuses) for phase in phases
         }
         return {
             "schema_version": 1,
@@ -281,10 +313,23 @@ def dispatch(args) -> dict:
         return workflow.run(
             target, stage=args.stage, profile=args.profile, allow_paid=args.allow_paid
         )
+    if name == "measure":
+        target = args.target or _infer_target(workflow, stage=args.stage)
+        return workflow.measure(
+            target,
+            stage=args.stage,
+            profile=args.profile,
+            allow_paid=args.allow_paid,
+            compare_to=args.compare_to,
+            report_dir=args.report_dir,
+            application_revision=args.revision,
+        )
+    if name == "compare":
+        return workflow.compare_runs(args.before, args.after)
     if name == "verify":
         return workflow.verify()
     if name == "status":
-        return workflow.status()
+        return workflow.status() if args.acceptance else workflow.measurement_status()
     if name == "report":
         if args.acceptance:
             if args.run:
@@ -436,6 +481,47 @@ def human_report(data: dict, *, verbose: bool = False) -> str:
         )
     if data.get("kind") == "acceptance-report":
         return re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", data["markdown"])
+    if data.get("kind") == "measurement-report":
+        return re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", data["markdown"])
+    if data.get("kind") == "measurement-comparison":
+        lines = [
+            f"EDD {data['change']} — COMPARISON {data['status'].upper()}",
+            f"Before: {data['before_run_id']}",
+            f"After: {data['after_run_id']}",
+        ]
+        if data["status"] == "comparable":
+            lines.extend(
+                f"  {name}: {delta:+.3f}" for name, delta in data.get("deltas", {}).items()
+            )
+        else:
+            lines.append(f"Reason: {data['reason']}")
+        changes = data.get("case_changes", {})
+        for name in ("added", "removed", "changed"):
+            if changes.get(name):
+                lines.append(f"Cases {name}: {', '.join(changes[name])}")
+        return "\n".join(lines)
+    if data.get("mode") == "measurement" and "workflow" in data:
+        workflow = data["workflow"]
+        lines = [
+            f"EDD {data['change']} — {workflow['phase'].upper()}",
+            workflow["summary"],
+            f"Scenarios: {data['scenario_count']}; deferred: {data['deferred_count']}",
+        ]
+        latest = data["latest_measurement"]
+        if latest.get("status") != "missing":
+            lines.append(
+                f"Latest: {latest['status']} execution "
+                f"{latest.get('execution_status', 'unknown')}; behavior "
+                f"{latest.get('behavior_decision', latest.get('decision', 'unknown'))}; "
+                f"record {latest.get('id', 'none')}"
+            )
+        action = data["actions"][0]
+        lines.append(f"Next ({action['actor']}): {action['label']}")
+        value = action.get("command") or action.get("chat")
+        if value:
+            lines.append(f"  {value}")
+        lines.append(f"Strict acceptance: {data['acceptance']['command']}")
+        return "\n".join(lines)
     if "workflow" in data:
         workflow = data["workflow"]
         heading = f"EDD {data['change']} — {workflow['phase'].upper()}"
@@ -471,7 +557,12 @@ def human_report(data: dict, *, verbose: bool = False) -> str:
             lines.append("No prepared changes")
             if data.get("actions"):
                 lines.append(f"Next: {data['actions'][0]['command']}")
-        for phase in ("prepare", "build", "check", "complete"):
+        phases = (
+            ("prepare", "measure", "improve")
+            if any(item.get("mode") == "measurement" for item in data["changes"])
+            else ("prepare", "build", "check", "complete")
+        )
+        for phase in phases:
             matching = [
                 item for item in data["changes"] if item.get("workflow", {}).get("phase") == phase
             ]
@@ -560,6 +651,12 @@ def main(argv: list[str] | None = None) -> int:
         data = dispatch(args)
         if args.command == "demo":
             code = 0 if data.get("demonstrated") else 2
+        elif args.command == "measure":
+            code = {"COMPLETE": 0, "ERROR": 2, "INCONCLUSIVE": 3}.get(
+                data.get("execution_status", ""), 2
+            )
+        elif args.command == "compare":
+            code = 0
         elif args.command in {"doctor", "inspect", "audit", "run", "verify", "check"}:
             code = EXIT.get(data.get("decision", ""), 0)
         else:
